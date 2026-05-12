@@ -14,6 +14,7 @@ from app.models.models import (
     Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
     Currency, Aircraft, Discrepancy, SafetyReport,
     FlightMode, CrewPosition, DiscrepancySeverity, DiscrepancyWorkStatus, Person, CurrencyType,
+    SortieLeg, InstrumentApproach,
 )
 from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
 from app.schemas.scheduling import FlightLogCreate
@@ -96,9 +97,32 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.amns_ntrs               = payload.amns_ntrs
     sortie.strafe_dry_profiles_day   = payload.strafe_dry_profiles_day
     sortie.strafe_dry_profiles_night = payload.strafe_dry_profiles_night
+    # Logbook / NAVFLIR fields
+    sortie.instrument_hours_simulated = payload.instrument_hours_simulated
+    sortie.landings_shipboard_day   = payload.landings_shipboard_day or None
+    sortie.landings_shipboard_night = payload.landings_shipboard_night or None
+    # Derive location from legs when provided; fall back to direct payload fields
+    if payload.legs:
+        sortie.departure_location = payload.legs[0].departure_location
+        sortie.arrival_location   = payload.legs[-1].arrival_location
+    else:
+        sortie.departure_location = payload.departure_location
+        sortie.arrival_location   = payload.arrival_location
     sortie.is_complete = True
 
     flight_date = payload.actual_takeoff_time.date()
+
+    # Create SortieLeg rows when routing was multi-stop
+    for leg_spec in payload.legs:
+        db.add(SortieLeg(
+            sortie_id=sortie.id,
+            leg_number=leg_spec.leg_number,
+            departure_location=leg_spec.departure_location,
+            arrival_location=leg_spec.arrival_location,
+            takeoff_time=leg_spec.takeoff_time,
+            land_time=leg_spec.land_time,
+            duration_hours=leg_spec.duration_hours,
+        ))
 
     # ── Step 4: update each FlightLog ───────────────────────────────────────────
     log_by_id: dict[int, FlightLog] = {fl.id: fl for fl in sortie.flight_logs}
@@ -113,6 +137,18 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             fl.syllabus_event_completed = actuals.syllabus_event_completed
         if actuals.instructor_remarks is not None:
             fl.instructor_remarks = actuals.instructor_remarks
+        fl.special_crew_time_hours = actuals.special_crew_time_hours
+        for appr in actuals.approaches:
+            db.add(InstrumentApproach(
+                flight_log_id=fl.id,
+                sortie_id=sortie.id,
+                approach_type=appr.approach_type,
+                actual_or_simulated=appr.actual_or_simulated,
+                airport_icao=appr.airport_icao,
+                runway=appr.runway,
+                remarks=appr.remarks,
+                logged_at=payload.actual_land_time,
+            ))
 
     # Build person_id → flight_log map for task-credit insertion
     log_by_person: dict[int, FlightLog] = {fl.person_id: fl for fl in sortie.flight_logs}

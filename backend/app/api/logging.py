@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import desc
 from datetime import date, datetime, time as dt_time
 from typing import List, Optional
@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.models import (
     Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
     SafetyReport, Discrepancy, Person,
-    CapabilityArea, DiscrepancySeverity,
+    CapabilityArea, DiscrepancySeverity, CrewPosition, FlightMode,
 )
 from app.schemas.logging import (
     CbrTaskOptionOut,
@@ -16,10 +16,13 @@ from app.schemas.logging import (
     UnscheduledSortiePayload,
     SafetyReportCreate, SafetyReportOut,
     TrainingJacketEntry, TrainingJacketTaskEntry,
+    ApproachEntry, LogbookEntry, LogbookTotals, LogbookWindowTotals,
+    LogbookFiltersApplied, LogbookPersonOut, LogbookResponse,
 )
 from app.schemas.sorties import SortieDetail, FlightLogOut
 from app.schemas.aircraft import DiscrepancyOut
 from app.services.flight_completion import complete_sortie, create_and_complete_unscheduled
+from app.services.logbook import build_window_totals
 
 router = APIRouter(prefix="/api/logging", tags=["logging"])
 
@@ -269,3 +272,130 @@ def create_safety_report(
     db.commit()
     db.refresh(report)
     return report
+
+
+# ---------- Logbook ----------
+
+@router.get("/logbook/{person_id}", response_model=LogbookResponse)
+def get_logbook(
+    person_id: int,
+    date_from: Optional[date] = Query(None, description="Filter entries on or after this date (YYYY-MM-DD)"),
+    date_to: Optional[date] = Query(None, description="Filter entries on or before this date, end-of-day inclusive"),
+    aircraft_id: Optional[int] = Query(None),
+    event_code: Optional[str] = Query(None),
+    crew_position: Optional[CrewPosition] = Query(None),
+    flight_mode: Optional[FlightMode] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Return a person's full flight logbook.
+
+    entries: completed sorties, filtered by query params, newest first.
+    totals: four fixed windows (career / 365d / 90d / 30d) computed from ALL
+            completed entries regardless of the user's filter.
+    """
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
+
+    # Single query: all completed flight logs for this person.
+    # joinedload for many-to-one (sortie → aircraft); selectinload for one-to-many (approaches).
+    all_logs: List[FlightLog] = (
+        db.query(FlightLog)
+        .join(Sortie, FlightLog.sortie_id == Sortie.id)
+        .options(
+            joinedload(FlightLog.sortie).joinedload(Sortie.aircraft),
+            selectinload(FlightLog.instrument_approaches),
+        )
+        .filter(
+            FlightLog.person_id == person_id,
+            Sortie.is_complete == True,
+        )
+        .order_by(desc(Sortie.takeoff_time), desc(Sortie.id))
+        .all()
+    )
+
+    # Apply user filters (entries display only — totals always use all_logs)
+    display_logs = all_logs
+    if date_from is not None:
+        cutoff = datetime.combine(date_from, dt_time.min)
+        display_logs = [fl for fl in display_logs
+                        if fl.sortie.takeoff_time and fl.sortie.takeoff_time >= cutoff]
+    if date_to is not None:
+        cutoff = datetime.combine(date_to, dt_time.max)
+        display_logs = [fl for fl in display_logs
+                        if fl.sortie.takeoff_time and fl.sortie.takeoff_time <= cutoff]
+    if aircraft_id is not None:
+        display_logs = [fl for fl in display_logs if fl.sortie.aircraft_id == aircraft_id]
+    if event_code is not None:
+        display_logs = [fl for fl in display_logs if fl.sortie.event_code == event_code]
+    if crew_position is not None:
+        display_logs = [fl for fl in display_logs if fl.crew_position == crew_position]
+    if flight_mode is not None:
+        display_logs = [fl for fl in display_logs if fl.sortie.flight_mode == flight_mode]
+
+    # Build entry list
+    entries: List[LogbookEntry] = []
+    for fl in display_logs:
+        s = fl.sortie
+        ac = s.aircraft
+        entries.append(LogbookEntry(
+            sortie_id=s.id,
+            flight_log_id=fl.id,
+            date=s.takeoff_time.date().isoformat() if s.takeoff_time else "",
+            tms=ac.type_model_series if ac else None,
+            bureau_number=ac.bureau_number if ac else None,
+            side_number=ac.side_number if ac else None,
+            event_code=s.event_code,
+            flight_mode=s.flight_mode.value,
+            crew_position=fl.crew_position.value,
+            departure_location=s.departure_location,
+            arrival_location=s.arrival_location,
+            total_hours=s.duration_hours or 0.0,
+            day_hours=s.day_hours or 0.0,
+            night_hours=s.night_hours or 0.0,
+            nvg_hours=s.nvg_hours or 0.0,
+            instrument_hours_actual=s.instrument_hours or 0.0,
+            instrument_hours_simulated=s.instrument_hours_simulated or 0.0,
+            special_crew_time_hours=fl.special_crew_time_hours or 0.0,
+            landings_day=s.landings_day or 0,
+            landings_night=s.landings_night or 0,
+            landings_dve_day=s.landings_dve_day or 0,
+            landings_dve_night=s.landings_dve_night or 0,
+            landings_shipboard_day=s.landings_shipboard_day or 0,
+            landings_shipboard_night=s.landings_shipboard_night or 0,
+            approaches=[
+                ApproachEntry(
+                    type=appr.approach_type.value,
+                    conditions=appr.actual_or_simulated.value,
+                    airport_icao=appr.airport_icao,
+                    runway=appr.runway,
+                    approach_remarks=appr.remarks,
+                )
+                for appr in fl.instrument_approaches
+            ],
+            remarks=fl.instructor_remarks or s.debrief_notes or None,
+        ))
+
+    # Fixed-window totals (independent of user filter)
+    window_dict = build_window_totals(all_logs)
+
+    return LogbookResponse(
+        person=LogbookPersonOut(
+            id=person.id,
+            name=f"{person.last_name}, {person.first_name}",
+            callsign=person.callsign,
+            rank=person.rank,
+            role=person.role.value,
+        ),
+        filters_applied=LogbookFiltersApplied(
+            date_from=date_from.isoformat() if date_from else None,
+            date_to=date_to.isoformat() if date_to else None,
+            aircraft_id=aircraft_id,
+            event_code=event_code,
+            crew_position=crew_position.value if crew_position else None,
+            flight_mode=flight_mode.value if flight_mode else None,
+        ),
+        entries=entries,
+        totals=LogbookWindowTotals(**window_dict),
+    )

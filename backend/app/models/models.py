@@ -166,6 +166,22 @@ class CurrencyAudience(str, enum.Enum):
     HOIST_OP_QUAL     = "HOIST_OP_QUAL"
 
 
+class ApproachType(str, enum.Enum):
+    ILS     = "ILS"
+    GPS     = "GPS"
+    RNAV    = "RNAV"
+    TACAN   = "TACAN"
+    VOR     = "VOR"
+    PAR     = "PAR"
+    ASR     = "ASR"
+    ENROUTE = "ENROUTE"
+
+
+class ApproachConditions(str, enum.Enum):
+    ACTUAL    = "ACTUAL"
+    SIMULATED = "SIMULATED"
+
+
 # ---------- Core entities ----------
 
 class Person(Base):
@@ -370,12 +386,21 @@ class Sortie(Base):
     strafe_dry_profiles_day   = Column(Integer, nullable=True)
     strafe_dry_profiles_night = Column(Integer, nullable=True)
 
+    # Logbook / NAVFLIR fields
+    # instrument_hours = actual IMC/partial-panel time; instrument_hours_simulated = SIM/TOFT or safety-pilot time
+    instrument_hours_simulated = Column(Float, default=0.0, nullable=False)
+    landings_shipboard_day   = Column(Integer, nullable=True)
+    landings_shipboard_night = Column(Integer, nullable=True)
+    departure_location = Column(String(16), nullable=True)   # ICAO code
+    arrival_location   = Column(String(16), nullable=True)   # ICAO code
+
     aircraft = relationship("Aircraft", back_populates="sorties")
     flight_logs = relationship("FlightLog", back_populates="sortie", cascade="all, delete-orphan")
     task_credits = relationship("SortieTaskCredit", back_populates="sortie", cascade="all, delete-orphan")
     safety_reports = relationship("SafetyReport", back_populates="sortie")
     discrepancies_filed = relationship("Discrepancy", back_populates="sortie", foreign_keys="Discrepancy.sortie_id")
     gradecards = relationship("Gradecard", back_populates="sortie")
+    legs = relationship("SortieLeg", back_populates="sortie", cascade="all, delete-orphan", order_by="SortieLeg.leg_number")
 
 
 class FlightLog(Base):
@@ -392,10 +417,14 @@ class FlightLog(Base):
     instructor_remarks = Column(Text, nullable=True)
     readiness_credits_count = Column(Integer, default=0, nullable=False)
 
+    # Logbook / NAVFLIR fields
+    special_crew_time_hours = Column(Float, default=0.0, nullable=False)
+
     sortie = relationship("Sortie", back_populates="flight_logs")
     person = relationship("Person", back_populates="flight_logs")
     task_credits = relationship("SortieTaskCredit", back_populates="flight_log", cascade="all, delete-orphan")
     gradecards = relationship("Gradecard", back_populates="flight_log")
+    instrument_approaches = relationship("InstrumentApproach", back_populates="flight_log", cascade="all, delete-orphan")
 
 
 # ---------- CBR task credits ----------
@@ -561,3 +590,44 @@ class GradecardLineItemResult(Base):
 
     gradecard = relationship("Gradecard", back_populates="line_item_results")
     line_item = relationship("GradecardLineItem", back_populates="results")
+
+
+# ---------- Multi-leg sortie routing ----------
+
+class SortieLeg(Base):
+    """One routing leg of a sortie. Only created when the sortie visits multiple locations."""
+    __tablename__ = "sortie_legs"
+    __table_args__ = (
+        UniqueConstraint("sortie_id", "leg_number", name="uq_sortie_leg_number"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    sortie_id = Column(Integer, ForeignKey("sorties.id"), nullable=False, index=True)
+    leg_number = Column(Integer, nullable=False)
+    departure_location = Column(String(16), nullable=False)   # ICAO code or hull number (e.g. CVN-71)
+    arrival_location = Column(String(16), nullable=False)
+    takeoff_time = Column(DateTime, nullable=True)
+    land_time = Column(DateTime, nullable=True)
+    duration_hours = Column(Float, nullable=True)
+
+    sortie = relationship("Sortie", back_populates="legs")
+
+
+# ---------- Instrument approaches (per-pilot per-sortie) ----------
+
+class InstrumentApproach(Base):
+    """One instrument approach logged by one crewmember on one sortie."""
+    __tablename__ = "instrument_approaches"
+
+    id = Column(Integer, primary_key=True)
+    flight_log_id = Column(Integer, ForeignKey("flight_logs.id"), nullable=False, index=True)
+    sortie_id = Column(Integer, ForeignKey("sorties.id"), nullable=False, index=True)
+    approach_type = Column(SQLEnum(ApproachType), nullable=False)
+    actual_or_simulated = Column(SQLEnum(ApproachConditions), nullable=False)
+    airport_icao = Column(String(16), nullable=False)
+    runway = Column(String(10), nullable=True)
+    remarks = Column(Text, nullable=True)
+    logged_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    flight_log = relationship("FlightLog", back_populates="instrument_approaches")
+    sortie = relationship("Sortie")
