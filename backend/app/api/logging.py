@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import desc
 from datetime import date, datetime, time as dt_time
@@ -19,11 +19,13 @@ from app.schemas.logging import (
     ApproachEntry, LogbookEntry, LogbookTotals, LogbookWindowTotals,
     LogbookFiltersApplied, LogbookPersonOut, LogbookResponse,
     LogbookTmrOut,
+    SortieTmrOut,
 )
 from app.schemas.sorties import SortieDetail, FlightLogOut
 from app.schemas.aircraft import DiscrepancyOut
 from app.services.flight_completion import complete_sortie, create_and_complete_unscheduled
 from app.services.logbook import build_window_totals
+from app.services.logbook_pdf import render_logbook_pdf
 
 router = APIRouter(prefix="/api/logging", tags=["logging"])
 
@@ -31,6 +33,21 @@ router = APIRouter(prefix="/api/logging", tags=["logging"])
 # ---------- Helpers ----------
 
 def _sortie_detail(s: Sortie) -> SortieDetail:
+    # Build TMR codes from the already-loaded sortie_tmr_codes relationship.
+    # _load_sortie_full() eager-loads sortie_tmr_codes → tmr_code, so no extra
+    # queries are needed here. This is the F1 fix: single source of truth with
+    # the GET /api/sorties/{id} builder.
+    tmr_codes_out = [
+        SortieTmrOut(
+            code=stc.tmr_code.code,
+            description=stc.tmr_code.description,
+            slot=stc.slot,
+            hours=stc.hours,
+        )
+        for stc in sorted(s.sortie_tmr_codes, key=lambda x: x.slot)
+        if stc.tmr_code
+    ]
+
     return SortieDetail.model_validate({
         "id": s.id,
         "event_code": s.event_code,
@@ -43,6 +60,7 @@ def _sortie_detail(s: Sortie) -> SortieDetail:
         "duration_hours": s.duration_hours,
         "is_complete": s.is_complete,
         "notes": s.notes,
+        "tmr_codes": tmr_codes_out,
         "flight_logs": [
             FlightLogOut.model_validate({
                 "id": fl.id,
@@ -441,4 +459,64 @@ def get_logbook(
         ),
         entries=entries,
         totals=LogbookWindowTotals(**window_dict),
+    )
+
+
+# ---------- Logbook PDF ----------
+
+@router.get("/logbook/{person_id}/pdf")
+def get_logbook_pdf(
+    person_id: int,
+    db: Session = Depends(get_db),
+):
+    """Full career logbook PDF (NAVFLIR OPNAV 3760/31). No filters, no watermark."""
+    try:
+        pdf_bytes = render_logbook_pdf(db, person_id, filters=None, watermark=False)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    person = db.query(Person).filter(Person.id == person_id).first()
+    filename = f"logbook_{person.last_name}_{person.first_name[0]}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/logbook/{person_id}/pdf/filtered")
+def get_logbook_pdf_filtered(
+    person_id: int,
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    aircraft_id: Optional[int] = Query(None),
+    event_code: Optional[str] = Query(None),
+    crew_position: Optional[CrewPosition] = Query(None),
+    flight_mode: Optional[FlightMode] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Filtered logbook PDF with watermark. Same query params as GET /logbook/{person_id}."""
+    filters = LogbookFiltersApplied(
+        date_from=date_from.isoformat() if date_from else None,
+        date_to=date_to.isoformat() if date_to else None,
+        aircraft_id=aircraft_id,
+        event_code=event_code,
+        crew_position=crew_position.value if crew_position else None,
+        flight_mode=flight_mode.value if flight_mode else None,
+    )
+    try:
+        pdf_bytes = render_logbook_pdf(db, person_id, filters=filters, watermark=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    person = db.query(Person).filter(Person.id == person_id).first()
+    filename = f"logbook_{person.last_name}_{person.first_name[0]}_filtered.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
