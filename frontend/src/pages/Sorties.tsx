@@ -51,7 +51,7 @@ export default function Sorties() {
   if (error || !data) {
     return (
       <div className="card border-red-600/50 bg-red-950/20 text-red-300">
-        Failed to load sorties. Is the backend running on port 8000?
+        Failed to load sorties. Is the backend running on port 8001?
       </div>
     );
   }

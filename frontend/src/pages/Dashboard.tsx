@@ -29,7 +29,7 @@ export default function Dashboard() {
   if (error || !data) {
     return (
       <div className="card border-red-600/50 bg-red-950/20 text-red-300">
-        Failed to load dashboard data. Is the backend running on port 8000?
+        Failed to load dashboard data. Is the backend running on port 8001?
       </div>
     );
   }

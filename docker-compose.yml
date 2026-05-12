@@ -3,13 +3,13 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: hscops
-      POSTGRES_PASSWORD: hscops_dev
-      POSTGRES_DB: hscops
+      POSTGRES_USER: squadron_ops
+      POSTGRES_PASSWORD: squadron_ops_dev
+      POSTGRES_DB: squadron_ops
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
-      - hscops_db:/var/lib/postgresql/data
+      - squadron_ops_db:/var/lib/postgresql/data
 
 volumes:
-  hscops_db:
+  squadron_ops_db:
