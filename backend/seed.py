@@ -36,12 +36,13 @@ from app.models.models import (
     Sortie, FlightLog, Discrepancy, CbrTaskOption, SortieTaskCredit, SafetyReport,
     CurrencyType, CurrencyApplicability,
     InspectionType, AircraftInspection,
+    SortieLeg, InstrumentApproach,
     Role, CrewPosition, AircraftStatus, DiscrepancySeverity, DiscrepancyWorkStatus,
     FlightMode, CapabilityArea, TaskGrade, CrewScope,
     SyllabusLevel, SyllabusStage, SyllabusTrack, EventVenue,
     GradingScheme, GradecardSection, LineItemRole,
     GradecardStatus, CompletionStatus, FourTierScore,
-    CurrencyAudience,
+    CurrencyAudience, ApproachType, ApproachConditions,
 )
 
 DEMO_PW = bc.hash("demo1234")
@@ -1161,6 +1162,10 @@ def seed_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list):
                 day_h, night_h, nvg_h, instr_h     = _allot(takeoff_dt, dur)
                 activity = _generate_activity(event_type, event_code, day_h, night_h, nvg_h)
 
+                # instrument_hours_simulated: LIVE with actual instrument time gets ~0 (real IMC);
+                # a small fraction is a safety-pilot sim pass — approximate as 0 in seed.
+                instr_sim_h = 0.0
+
                 sortie = Sortie(
                     event_type=event_type,
                     event_code=event_code,
@@ -1173,6 +1178,11 @@ def seed_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list):
                     night_hours=night_h,
                     nvg_hours=nvg_h,
                     instrument_hours=instr_h,
+                    instrument_hours_simulated=instr_sim_h,
+                    landings_shipboard_day=0,
+                    landings_shipboard_night=0,
+                    departure_location="KNKX",
+                    arrival_location="KNKX",
                     is_complete=True,
                     flight_mode=FlightMode.LIVE,
                     notes=random.choice(_NOTES),
@@ -1208,13 +1218,58 @@ def seed_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list):
                     db.add(lg)
                 db.flush()
 
-                all_logs.append((sortie, logs))
+                all_logs.append((sortie, logs, instr_h))
                 log_count    += len(logs)
                 sortie_count += 1
 
         day += timedelta(days=1)
 
     return sortie_count, log_count, all_logs
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Instrument Approaches  (seeded for historical sorties with instrument time)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_APPROACH_TYPE_POOL = [
+    ApproachType.ILS, ApproachType.GPS, ApproachType.RNAV,
+    ApproachType.TACAN, ApproachType.VOR,
+]
+
+_APPROACH_AIRPORTS = ["KNKX", "KNZY", "KSEE", "KMYF", "KCRQ"]
+
+
+def seed_instrument_approaches(db, all_logs):
+    """
+    Seed InstrumentApproach rows for completed historical sorties that have
+    instrument_hours > 0.  1–3 approaches per eligible flight log (pilots only).
+    All are ACTUAL (LIVE sorties, zero simulated in the historical seed).
+    """
+    count = 0
+    pilot_positions = {CrewPosition.HAC, CrewPosition.H2P, CrewPosition.H2P_U}
+
+    for sortie, logs, instr_h in all_logs:
+        if instr_h <= 0:
+            continue
+        n_approaches = random.randint(1, 3)
+        for fl in logs:
+            if fl.crew_position not in pilot_positions:
+                continue
+            for _ in range(n_approaches):
+                db.add(InstrumentApproach(
+                    flight_log_id=fl.id,
+                    sortie_id=sortie.id,
+                    approach_type=random.choice(_APPROACH_TYPE_POOL),
+                    actual_or_simulated=ApproachConditions.ACTUAL,
+                    airport_icao=random.choice(_APPROACH_AIRPORTS),
+                    runway=None,
+                    remarks=None,
+                    logged_at=sortie.land_time or sortie.takeoff_time,
+                ))
+                count += 1
+
+    db.flush()
+    return count
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1337,7 +1392,7 @@ def seed_discrepancies(db, aircraft_list):
 
 def seed_task_credits(db, all_logs):
     count = 0
-    for sortie, logs in all_logs:
+    for sortie, logs, _instr_h in all_logs:
         task_pool = _EVENT_TASK_MAP.get(sortie.event_type or "", ["MOB 203"])
         for fl in logs:
             if random.random() > 0.30:
@@ -1361,7 +1416,7 @@ def seed_safety_reports(db, all_logs, all_pilots):
     if not all_logs or not all_pilots:
         return count
 
-    s1, logs1 = random.choice(all_logs)
+    s1, logs1, _ = random.choice(all_logs)
     hac1 = next((fl for fl in logs1 if fl.crew_position == CrewPosition.HAC), logs1[0])
     db.add(SafetyReport(
         sortie_id=s1.id, reported_by_person_id=hac1.person_id,
@@ -1372,9 +1427,9 @@ def seed_safety_reports(db, all_logs, all_pilots):
     ))
     count += 1
 
-    s2, logs2 = random.choice(all_logs)
+    s2, logs2, _ = random.choice(all_logs)
     while s2.id == s1.id:
-        s2, logs2 = random.choice(all_logs)
+        s2, logs2, _ = random.choice(all_logs)
     hac2 = next((fl for fl in logs2 if fl.crew_position == CrewPosition.HAC), logs2[0])
     db.add(SafetyReport(
         sortie_id=s2.id, reported_by_person_id=hac2.person_id,
@@ -1411,7 +1466,7 @@ def seed_historical_gradecards(db, all_logs):
     }
     count = 0
 
-    for sortie, logs in all_logs:
+    for sortie, logs, _instr_h in all_logs:
         ec = sortie.event_code
         if not ec:
             continue
@@ -1695,6 +1750,9 @@ def main():
         print("Seeding historical sorties and flight logs...")
         sortie_count, log_count, all_logs = seed_sorties(db, aircraft_list, hac_pilots, pilots, aircrew)
 
+        print("Seeding instrument approaches...")
+        approach_count = seed_instrument_approaches(db, all_logs)
+
         print("Seeding discrepancies...")
         discrepancy_count, disc_by_sev = seed_discrepancies(db, aircraft_list)
 
@@ -1725,7 +1783,8 @@ def main():
             f"CBR: {task_option_count} task options.\n"
             f"Sorties: {sortie_count} historical + {sched_count} scheduled = "
             f"{sortie_count + sched_count} total, "
-            f"{log_count + sched_log_count} flight_logs.\n"
+            f"{log_count + sched_log_count} flight_logs, "
+            f"{approach_count} instrument_approaches.\n"
             f"Discrepancies: {discrepancy_count} total "
             f"({', '.join(f'{k}={v}' for k, v in disc_by_sev.items() if v)}), "
             f"task_credits: {task_credit_count}, "

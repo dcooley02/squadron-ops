@@ -1,8 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import date, datetime
-from typing import Optional, List
+from typing import Optional, List, Dict
 from app.models.models import (
     CrewPosition, DiscrepancySeverity, FlightMode, CapabilityArea, TaskGrade, CrewScope,
+    ApproachType, ApproachConditions,
 )
 
 
@@ -79,6 +80,27 @@ class SafetyReportOut(BaseModel):
     closed_at: Optional[datetime] = None
 
 
+# ---------- Logbook sub-schemas ----------
+
+class ApproachPayload(BaseModel):
+    """One instrument approach logged per crewmember at debrief."""
+    approach_type: ApproachType
+    actual_or_simulated: ApproachConditions
+    airport_icao: str
+    runway: Optional[str] = None
+    remarks: Optional[str] = None
+
+
+class SortieLegPayload(BaseModel):
+    """One routing leg for a multi-stop sortie."""
+    leg_number: int
+    departure_location: str
+    arrival_location: str
+    takeoff_time: Optional[datetime] = None
+    land_time: Optional[datetime] = None
+    duration_hours: Optional[float] = None
+
+
 # ---------- Flight log actuals ----------
 
 class FlightLogActuals(BaseModel):
@@ -87,6 +109,8 @@ class FlightLogActuals(BaseModel):
     hours_logged: float
     syllabus_event_completed: Optional[str] = None
     instructor_remarks: Optional[str] = None
+    special_crew_time_hours: float = 0.0
+    approaches: List[ApproachPayload] = []
 
 
 # ---------- Sortie completion ----------
@@ -117,6 +141,13 @@ class SortieCompletePayload(BaseModel):
     amns_ntrs: Optional[int] = None
     strafe_dry_profiles_day: Optional[int] = None
     strafe_dry_profiles_night: Optional[int] = None
+    # Logbook / NAVFLIR fields
+    instrument_hours_simulated: float = 0.0
+    landings_shipboard_day: int = 0
+    landings_shipboard_night: int = 0
+    departure_location: Optional[str] = None
+    arrival_location: Optional[str] = None
+    legs: List[SortieLegPayload] = []
     flight_log_actuals: List[FlightLogActuals]
     task_credits: List[TaskCreditCreate] = []
     new_discrepancies: List[DiscrepancyCreate] = []
@@ -181,3 +212,92 @@ class TrainingJacketEntry(BaseModel):
     instructor_remarks: Optional[str] = None
     syllabus_event_completed: Optional[str] = None
     task_credits: List[TrainingJacketTaskEntry] = []
+
+
+# ---------- Logbook endpoint ----------
+
+class ApproachEntry(BaseModel):
+    type: str
+    conditions: str
+    airport_icao: Optional[str] = None
+    runway: Optional[str] = None
+    approach_remarks: Optional[str] = None
+
+
+class LogbookEntry(BaseModel):
+    sortie_id: int
+    flight_log_id: int
+    date: str
+    tms: Optional[str] = None
+    bureau_number: Optional[str] = None
+    side_number: Optional[str] = None
+    event_code: Optional[str] = None
+    flight_mode: str
+    crew_position: str
+    departure_location: Optional[str] = None
+    arrival_location: Optional[str] = None
+    total_hours: float
+    day_hours: float
+    night_hours: float
+    nvg_hours: float
+    instrument_hours_actual: float
+    instrument_hours_simulated: float
+    special_crew_time_hours: float
+    landings_day: int
+    landings_night: int
+    landings_dve_day: int
+    landings_dve_night: int
+    landings_shipboard_day: int
+    landings_shipboard_night: int
+    approaches: List[ApproachEntry] = []
+    remarks: Optional[str] = None
+
+
+class LogbookTotals(BaseModel):
+    total_hours: float
+    day_hours: float
+    night_hours: float
+    nvg_hours: float
+    instrument_hours_actual: float
+    instrument_hours_simulated: float
+    landings_day: int
+    landings_night: int
+    landings_dve_day: int
+    landings_dve_night: int
+    landings_shipboard_day: int
+    landings_shipboard_night: int
+    approaches_total: int
+    approaches_by_type: Dict[str, int]
+    sortie_count: int
+    flight_log_count: int
+
+
+class LogbookWindowTotals(BaseModel):
+    career: LogbookTotals
+    last_365d: LogbookTotals
+    last_90d: LogbookTotals
+    last_30d: LogbookTotals
+
+
+class LogbookFiltersApplied(BaseModel):
+    date_from: Optional[str] = None
+    date_to: Optional[str] = None
+    aircraft_id: Optional[int] = None
+    event_code: Optional[str] = None
+    crew_position: Optional[str] = None
+    flight_mode: Optional[str] = None
+
+
+class LogbookPersonOut(BaseModel):
+    id: int
+    name: str
+    callsign: Optional[str] = None
+    rank: str
+    role: str
+
+
+class LogbookResponse(BaseModel):
+    person: LogbookPersonOut
+    filters_applied: LogbookFiltersApplied
+    entries: List[LogbookEntry]
+    totals: LogbookWindowTotals

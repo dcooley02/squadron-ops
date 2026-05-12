@@ -4,8 +4,11 @@ from sqlalchemy import and_
 from datetime import date, datetime, time as dt_time
 from typing import List, Optional
 from app.database import get_db
-from app.models.models import Sortie, FlightLog, SortieTaskCredit
-from app.schemas.sorties import SortieSummary, SortieDetail, FlightLogOut, SortieTaskCreditOut
+from app.models.models import Sortie, FlightLog, SortieTaskCredit, SortieLeg, InstrumentApproach
+from app.schemas.sorties import (
+    SortieSummary, SortieDetail, FlightLogOut, SortieTaskCreditOut,
+    SortieLegRead, InstrumentApproachRead,
+)
 
 router = APIRouter(prefix="/api/sorties", tags=["sorties"])
 
@@ -25,6 +28,30 @@ def _summary(s: Sortie) -> SortieSummary:
     })
 
 
+def _approach_out(appr: InstrumentApproach) -> InstrumentApproachRead:
+    return InstrumentApproachRead.model_validate({
+        "id": appr.id,
+        "approach_type": appr.approach_type.value,
+        "actual_or_simulated": appr.actual_or_simulated.value,
+        "airport_icao": appr.airport_icao,
+        "runway": appr.runway,
+        "remarks": appr.remarks,
+        "logged_at": appr.logged_at,
+    })
+
+
+def _leg_out(leg: SortieLeg) -> SortieLegRead:
+    return SortieLegRead.model_validate({
+        "id": leg.id,
+        "leg_number": leg.leg_number,
+        "departure_location": leg.departure_location,
+        "arrival_location": leg.arrival_location,
+        "takeoff_time": leg.takeoff_time,
+        "land_time": leg.land_time,
+        "duration_hours": leg.duration_hours,
+    })
+
+
 def _log_out(fl: FlightLog) -> FlightLogOut:
     return FlightLogOut.model_validate({
         "id": fl.id,
@@ -33,6 +60,8 @@ def _log_out(fl: FlightLog) -> FlightLogOut:
         "crew_position": fl.crew_position,
         "hours_logged": fl.hours_logged,
         "syllabus_event_completed": fl.syllabus_event_completed,
+        "special_crew_time_hours": fl.special_crew_time_hours,
+        "instrument_approaches": [_approach_out(a) for a in fl.instrument_approaches],
     })
 
 
@@ -78,9 +107,11 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
         .options(
             joinedload(Sortie.aircraft),
             joinedload(Sortie.flight_logs).joinedload(FlightLog.person),
+            joinedload(Sortie.flight_logs).joinedload(FlightLog.instrument_approaches),
             joinedload(Sortie.task_credits)
                 .joinedload(SortieTaskCredit.flight_log)
                 .joinedload(FlightLog.person),
+            joinedload(Sortie.legs),
         )
         .filter(Sortie.id == sortie_id)
         .first()
@@ -121,6 +152,12 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
         "amns_ntrs": s.amns_ntrs,
         "strafe_dry_profiles_day": s.strafe_dry_profiles_day,
         "strafe_dry_profiles_night": s.strafe_dry_profiles_night,
+        "instrument_hours_simulated": s.instrument_hours_simulated,
+        "landings_shipboard_day": s.landings_shipboard_day,
+        "landings_shipboard_night": s.landings_shipboard_night,
+        "departure_location": s.departure_location,
+        "arrival_location": s.arrival_location,
+        "legs": [_leg_out(leg) for leg in s.legs],
         "flight_logs": [_log_out(fl) for fl in s.flight_logs],
         "task_credits": [_credit_out(tc) for tc in s.task_credits],
     })
