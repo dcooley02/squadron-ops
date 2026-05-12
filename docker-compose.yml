@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hscops
+      POSTGRES_PASSWORD: hscops_dev
+      POSTGRES_DB: hscops
+    ports:
+      - "5432:5432"
+    volumes:
+      - hscops_db:/var/lib/postgresql/data
+
+volumes:
+  hscops_db:
