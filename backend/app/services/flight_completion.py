@@ -14,7 +14,7 @@ from app.models.models import (
     Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
     Currency, Aircraft, Discrepancy, SafetyReport,
     FlightMode, CrewPosition, DiscrepancySeverity, DiscrepancyWorkStatus, Person, CurrencyType,
-    SortieLeg, InstrumentApproach,
+    SortieLeg, InstrumentApproach, TmrCode, SortieTmrCode, DataProvenance,
 )
 from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
 from app.schemas.scheduling import FlightLogCreate
@@ -76,10 +76,6 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.takeoff_time = payload.actual_takeoff_time
     sortie.land_time = payload.actual_land_time
     sortie.duration_hours = payload.duration_hours
-    sortie.day_hours = payload.day_hours
-    sortie.night_hours = payload.night_hours
-    sortie.nvg_hours = payload.nvg_hours
-    sortie.instrument_hours = payload.instrument_hours
     sortie.debrief_notes = payload.debrief_notes
     # Activity quantities — written through from debrief payload; null stays null.
     sortie.rounds_fired_20mm       = payload.rounds_fired_20mm
@@ -98,7 +94,6 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.strafe_dry_profiles_day   = payload.strafe_dry_profiles_day
     sortie.strafe_dry_profiles_night = payload.strafe_dry_profiles_night
     # Logbook / NAVFLIR fields
-    sortie.instrument_hours_simulated = payload.instrument_hours_simulated
     sortie.landings_shipboard_day   = payload.landings_shipboard_day or None
     sortie.landings_shipboard_night = payload.landings_shipboard_night or None
     # Derive location from legs when provided; fall back to direct payload fields
@@ -124,6 +119,22 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             duration_hours=leg_spec.duration_hours,
         ))
 
+    # Create SortieTmrCode junction rows (one per slot, max 3)
+    tmr_code_cache: dict[str, TmrCode] = {}
+    for tmr_assign in payload.tmr_codes:
+        tmr_obj = tmr_code_cache.get(tmr_assign.code)
+        if tmr_obj is None:
+            tmr_obj = db.query(TmrCode).filter(TmrCode.code == tmr_assign.code).first()
+            if tmr_obj is None:
+                continue  # unknown code; skip silently
+            tmr_code_cache[tmr_assign.code] = tmr_obj
+        db.add(SortieTmrCode(
+            sortie_id=sortie.id,
+            tmr_code_id=tmr_obj.id,
+            slot=tmr_assign.slot,
+            hours=tmr_assign.hours,
+        ))
+
     # ── Step 4: update each FlightLog ───────────────────────────────────────────
     log_by_id: dict[int, FlightLog] = {fl.id: fl for fl in sortie.flight_logs}
     for actuals in payload.flight_log_actuals:
@@ -133,6 +144,24 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
                 f"FlightLog {actuals.flight_log_id} not found on sortie {sortie_id}"
             )
         fl.hours_logged = actuals.hours_logged
+        # Environment hours
+        fl.night_hours = actuals.night_hours
+        fl.nvg_hours = actuals.nvg_hours
+        fl.actual_instrument_hours = actuals.actual_instrument_hours
+        fl.sim_instrument_hours = actuals.sim_instrument_hours
+        # Role hours
+        fl.total_hours = actuals.total_hours
+        fl.first_pilot_hours = actuals.first_pilot_hours
+        fl.copilot_hours = actuals.copilot_hours
+        fl.ac_commander_hours = actuals.ac_commander_hours
+        fl.mission_commander_hours = actuals.mission_commander_hours
+        fl.instructor_hours = actuals.instructor_hours
+        # NVG subcategories
+        fl.nvg_unaided_hl_hours = actuals.nvg_unaided_hl_hours
+        fl.nvg_unaided_ll_hours = actuals.nvg_unaided_ll_hours
+        fl.nvg_tactical_hl_hours = actuals.nvg_tactical_hl_hours
+        fl.nvg_tactical_ll_hours = actuals.nvg_tactical_ll_hours
+        fl.data_provenance = DataProvenance.ENTERED
         if actuals.syllabus_event_completed is not None:
             fl.syllabus_event_completed = actuals.syllabus_event_completed
         if actuals.instructor_remarks is not None:
@@ -203,7 +232,7 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             if flight_mode == FlightMode.SIM_TOFT and not ct.sim_eligible:
                 continue
             rule = RENEWAL_RULES.get(ct.code)
-            if rule and rule(sortie):
+            if rule and rule(sortie, fl):
                 _upsert_currency_typed(db, person.id, ct, flight_date)
 
     # ── Step 7: update aircraft hours (LIVE only) ────────────────────────────────
@@ -279,10 +308,6 @@ def create_and_complete_unscheduled(
         takeoff_time=payload.takeoff_time,
         land_time=payload.land_time,
         duration_hours=payload.duration_hours or 0.0,
-        day_hours=payload.day_hours or 0.0,
-        night_hours=payload.night_hours or 0.0,
-        nvg_hours=payload.nvg_hours or 0.0,
-        instrument_hours=payload.instrument_hours or 0.0,
         notes=payload.notes,
         flight_mode=payload.flight_mode,
         simulator_id=payload.simulator_id,

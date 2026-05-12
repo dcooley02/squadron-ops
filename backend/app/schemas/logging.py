@@ -1,9 +1,9 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import date, datetime
 from typing import Optional, List, Dict
 from app.models.models import (
     CrewPosition, DiscrepancySeverity, FlightMode, CapabilityArea, TaskGrade, CrewScope,
-    ApproachType, ApproachConditions,
+    ApproachType, ApproachConditions, DataProvenance,
 )
 
 
@@ -107,6 +107,23 @@ class FlightLogActuals(BaseModel):
     """Actual figures for one crewmember after debriefing."""
     flight_log_id: int
     hours_logged: float
+    # Environment hours
+    night_hours: float = 0.0
+    nvg_hours: float = 0.0
+    actual_instrument_hours: float = 0.0
+    sim_instrument_hours: float = 0.0
+    # Role hours
+    total_hours: float = 0.0
+    first_pilot_hours: float = 0.0
+    copilot_hours: float = 0.0
+    ac_commander_hours: float = 0.0
+    mission_commander_hours: float = 0.0
+    instructor_hours: float = 0.0
+    # NVG sub-categories
+    nvg_unaided_hl_hours: float = 0.0
+    nvg_unaided_ll_hours: float = 0.0
+    nvg_tactical_hl_hours: float = 0.0
+    nvg_tactical_ll_hours: float = 0.0
     syllabus_event_completed: Optional[str] = None
     instructor_remarks: Optional[str] = None
     special_crew_time_hours: float = 0.0
@@ -115,15 +132,18 @@ class FlightLogActuals(BaseModel):
 
 # ---------- Sortie completion ----------
 
+class TmrCodeAssignment(BaseModel):
+    """Assign a TMR code to a MSN slot (1–3) for a sortie per CNAF M-3710.7 Appendix D."""
+    code: str
+    slot: int = Field(ge=1, le=3, description="MSN slot: 1 (MSN1), 2 (MSN2), or 3 (MSN3)")
+    hours: Optional[float] = None
+
+
 class SortieCompletePayload(BaseModel):
     """Everything needed to close out a completed sortie."""
     actual_takeoff_time: datetime
     actual_land_time: datetime
     duration_hours: float
-    day_hours: float
-    night_hours: float
-    nvg_hours: float
-    instrument_hours: float
     debrief_notes: Optional[str] = None
     # Activity quantities — all optional; null treated as 0 by the cascade.
     rounds_fired_20mm: Optional[int] = None
@@ -142,7 +162,6 @@ class SortieCompletePayload(BaseModel):
     strafe_dry_profiles_day: Optional[int] = None
     strafe_dry_profiles_night: Optional[int] = None
     # Logbook / NAVFLIR fields
-    instrument_hours_simulated: float = 0.0
     landings_shipboard_day: int = 0
     landings_shipboard_night: int = 0
     departure_location: Optional[str] = None
@@ -150,6 +169,7 @@ class SortieCompletePayload(BaseModel):
     legs: List[SortieLegPayload] = []
     flight_log_actuals: List[FlightLogActuals]
     task_credits: List[TaskCreditCreate] = []
+    tmr_codes: List[TmrCodeAssignment] = Field(default=[], max_length=3)
     new_discrepancies: List[DiscrepancyCreate] = []
     safety_reports: List[SafetyReportCreate] = []
 
@@ -177,10 +197,6 @@ class UnscheduledSortiePayload(BaseModel):
     takeoff_time: datetime
     land_time: Optional[datetime] = None
     duration_hours: Optional[float] = None
-    day_hours: Optional[float] = 0.0
-    night_hours: Optional[float] = 0.0
-    nvg_hours: Optional[float] = 0.0
-    instrument_hours: Optional[float] = 0.0
     notes: Optional[str] = None
     flight_mode: FlightMode = FlightMode.LIVE
     simulator_id: Optional[str] = None
@@ -214,6 +230,32 @@ class TrainingJacketEntry(BaseModel):
     task_credits: List[TrainingJacketTaskEntry] = []
 
 
+# ---------- TMR read schemas ----------
+
+class LogbookTmrOut(BaseModel):
+    code: str
+    slot: int
+    hours: Optional[float] = None
+
+
+class SortieTmrOut(BaseModel):
+    code: str
+    description: str
+    slot: int
+    hours: Optional[float] = None
+
+
+class TmrCodeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    description: str
+    fpc: str
+    gpc: str
+    spc: str
+    capability_area: Optional[str] = None
+
+
 # ---------- Logbook endpoint ----------
 
 class ApproachEntry(BaseModel):
@@ -236,13 +278,25 @@ class LogbookEntry(BaseModel):
     crew_position: str
     departure_location: Optional[str] = None
     arrival_location: Optional[str] = None
+    # Hours
     total_hours: float
-    day_hours: float
     night_hours: float
     nvg_hours: float
-    instrument_hours_actual: float
-    instrument_hours_simulated: float
+    actual_instrument_hours: float
+    sim_instrument_hours: float
+    # Role hours
+    first_pilot_hours: float = 0.0
+    copilot_hours: float = 0.0
+    ac_commander_hours: float = 0.0
+    mission_commander_hours: float = 0.0
+    instructor_hours: float = 0.0
     special_crew_time_hours: float
+    # NVG subcategories
+    nvg_unaided_hl_hours: float = 0.0
+    nvg_unaided_ll_hours: float = 0.0
+    nvg_tactical_hl_hours: float = 0.0
+    nvg_tactical_ll_hours: float = 0.0
+    # Landings
     landings_day: int
     landings_night: int
     landings_dve_day: int
@@ -250,16 +304,23 @@ class LogbookEntry(BaseModel):
     landings_shipboard_day: int
     landings_shipboard_night: int
     approaches: List[ApproachEntry] = []
+    tmr_codes: List[LogbookTmrOut] = []
     remarks: Optional[str] = None
+    data_provenance: Optional[str] = None
 
 
 class LogbookTotals(BaseModel):
     total_hours: float
-    day_hours: float
     night_hours: float
     nvg_hours: float
-    instrument_hours_actual: float
-    instrument_hours_simulated: float
+    total_actual_instrument_hours: float
+    total_sim_instrument_hours: float
+    total_first_pilot_hours: float
+    total_copilot_hours: float
+    total_ac_commander_hours: float
+    total_mission_commander_hours: float
+    total_instructor_hours: float
+    total_spec_crew_hours: float
     landings_day: int
     landings_night: int
     landings_dve_day: int
@@ -270,6 +331,7 @@ class LogbookTotals(BaseModel):
     approaches_by_type: Dict[str, int]
     sortie_count: int
     flight_log_count: int
+    data_provenance_breakdown: Dict[str, int] = {}
 
 
 class LogbookWindowTotals(BaseModel):

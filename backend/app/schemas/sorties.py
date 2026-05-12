@@ -1,7 +1,8 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional, List
-from app.models.models import CrewPosition, FlightMode, TaskGrade
+from app.models.models import CrewPosition, FlightMode, TaskGrade, DataProvenance
+from app.schemas.logging import SortieTmrOut
 
 
 class SortieLegRead(BaseModel):
@@ -36,8 +37,27 @@ class FlightLogOut(BaseModel):
     person_name: str
     crew_position: CrewPosition
     hours_logged: float
+    # Environment hours
+    night_hours: float = 0.0
+    nvg_hours: float = 0.0
+    actual_instrument_hours: float = 0.0
+    sim_instrument_hours: float = 0.0
+    # Role hours
+    total_hours: float = 0.0
+    first_pilot_hours: float = 0.0
+    copilot_hours: float = 0.0
+    ac_commander_hours: float = 0.0
+    mission_commander_hours: float = 0.0
+    instructor_hours: float = 0.0
+    # NVG subcategories
+    nvg_unaided_hl_hours: float = 0.0
+    nvg_unaided_ll_hours: float = 0.0
+    nvg_tactical_hl_hours: float = 0.0
+    nvg_tactical_ll_hours: float = 0.0
     syllabus_event_completed: Optional[str] = None
+    instructor_remarks: Optional[str] = None
     special_crew_time_hours: Optional[float] = None
+    data_provenance: DataProvenance = DataProvenance.ENTERED
     instrument_approaches: List[InstrumentApproachRead] = []
 
 
@@ -68,10 +88,6 @@ class SortieSummary(BaseModel):
 
 
 class SortieDetail(SortieSummary):
-    day_hours: Optional[float] = None
-    night_hours: Optional[float] = None
-    nvg_hours: Optional[float] = None
-    instrument_hours: Optional[float] = None
     debrief_notes: Optional[str] = None
     notes: Optional[str] = None
     flight_mode: FlightMode = FlightMode.LIVE
@@ -92,7 +108,6 @@ class SortieDetail(SortieSummary):
     strafe_dry_profiles_day: Optional[int] = None
     strafe_dry_profiles_night: Optional[int] = None
     # Logbook / NAVFLIR fields
-    instrument_hours_simulated: Optional[float] = None
     landings_shipboard_day: Optional[int] = None
     landings_shipboard_night: Optional[int] = None
     departure_location: Optional[str] = None
@@ -100,3 +115,4 @@ class SortieDetail(SortieSummary):
     legs: List[SortieLegRead] = []
     flight_logs: List[FlightLogOut] = []
     task_credits: List[SortieTaskCreditOut] = []
+    tmr_codes: List[SortieTmrOut] = []

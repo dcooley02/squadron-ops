@@ -97,10 +97,6 @@ def create_sortie(payload: SortieCreate, db: Session = Depends(get_db)):
         takeoff_time=payload.takeoff_time,
         land_time=payload.land_time,
         duration_hours=payload.duration_hours,
-        day_hours=payload.day_hours or 0.0,
-        night_hours=payload.night_hours or 0.0,
-        nvg_hours=payload.nvg_hours or 0.0,
-        instrument_hours=payload.instrument_hours or 0.0,
         notes=payload.notes,
         is_complete=False,
     )
