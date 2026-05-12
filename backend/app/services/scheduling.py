@@ -64,22 +64,16 @@ def _is_night(sortie: Sortie) -> bool:
 
 
 def _requires_nvg(sortie: Sortie) -> bool:
-    has_nvg_hours = bool(sortie.nvg_hours and sortie.nvg_hours > 0)
-    has_nvg_type = bool(sortie.event_type and "NVG" in sortie.event_type.upper())
-    return has_nvg_hours or has_nvg_type
+    # Planned sorties have no flight-log hours yet; use event_type as proxy
+    return bool(sortie.event_type and "NVG" in sortie.event_type.upper())
 
 
 def _currencies_sortie_refreshes(sortie: Sortie) -> set[str]:
-    """Return the set of currency codes that flying this sortie would refresh."""
+    """Return the set of currency codes that flying this sortie would refresh.
+    For planned (incomplete) sorties, use event_type as proxy since
+    per-crewmember hour columns are only populated at debrief.
+    """
     refreshed: set[str] = set()
-    if sortie.nvg_hours and sortie.nvg_hours > 0:
-        refreshed.add("NVG")
-    if sortie.instrument_hours and sortie.instrument_hours > 0:
-        refreshed.add("INSTR")
-    if sortie.day_hours and sortie.day_hours > 0:
-        refreshed.add("DAY_DL")
-    if sortie.night_hours and sortie.night_hours > 0:
-        refreshed.add("NIGHT_DL")
     if sortie.event_type and "SAR" in sortie.event_type.upper():
         refreshed.update({"SAR_DAY", "SAR_NIGHT"})
     return refreshed

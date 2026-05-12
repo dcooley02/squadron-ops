@@ -1174,11 +1174,6 @@ def seed_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list):
                     takeoff_time=takeoff_dt,
                     land_time=land_dt,
                     duration_hours=dur,
-                    day_hours=day_h,
-                    night_hours=night_h,
-                    nvg_hours=nvg_h,
-                    instrument_hours=instr_h,
-                    instrument_hours_simulated=instr_sim_h,
                     landings_shipboard_day=0,
                     landings_shipboard_night=0,
                     departure_location="KNKX",
@@ -1646,7 +1641,6 @@ def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list)
             event_type=event_type, event_code=event_code, aircraft_id=ac.id,
             brief_time=to_dt - timedelta(hours=1, minutes=30), takeoff_time=to_dt,
             land_time=to_dt + timedelta(hours=dur), duration_hours=dur,
-            day_hours=day_h, night_hours=night_h, nvg_hours=nvg_h, instrument_hours=instr_h,
             is_complete=False, flight_mode=FlightMode.LIVE, notes=notes,
         )
         db.add(s)

@@ -7,7 +7,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.models.models import (
     Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
-    SafetyReport, Discrepancy, Person,
+    SafetyReport, Discrepancy, Person, SortieTmrCode,
     CapabilityArea, DiscrepancySeverity, CrewPosition, FlightMode,
 )
 from app.schemas.logging import (
@@ -18,6 +18,7 @@ from app.schemas.logging import (
     TrainingJacketEntry, TrainingJacketTaskEntry,
     ApproachEntry, LogbookEntry, LogbookTotals, LogbookWindowTotals,
     LogbookFiltersApplied, LogbookPersonOut, LogbookResponse,
+    LogbookTmrOut,
 )
 from app.schemas.sorties import SortieDetail, FlightLogOut
 from app.schemas.aircraft import DiscrepancyOut
@@ -41,10 +42,6 @@ def _sortie_detail(s: Sortie) -> SortieDetail:
         "land_time": s.land_time,
         "duration_hours": s.duration_hours,
         "is_complete": s.is_complete,
-        "day_hours": s.day_hours,
-        "night_hours": s.night_hours,
-        "nvg_hours": s.nvg_hours,
-        "instrument_hours": s.instrument_hours,
         "notes": s.notes,
         "flight_logs": [
             FlightLogOut.model_validate({
@@ -53,7 +50,25 @@ def _sortie_detail(s: Sortie) -> SortieDetail:
                 "person_name": f"{fl.person.last_name}, {fl.person.first_name}",
                 "crew_position": fl.crew_position,
                 "hours_logged": fl.hours_logged,
+                "night_hours": fl.night_hours or 0.0,
+                "nvg_hours": fl.nvg_hours or 0.0,
+                "actual_instrument_hours": fl.actual_instrument_hours or 0.0,
+                "sim_instrument_hours": fl.sim_instrument_hours or 0.0,
+                "total_hours": fl.total_hours or fl.hours_logged,
+                "first_pilot_hours": fl.first_pilot_hours or 0.0,
+                "copilot_hours": fl.copilot_hours or 0.0,
+                "ac_commander_hours": fl.ac_commander_hours or 0.0,
+                "mission_commander_hours": fl.mission_commander_hours or 0.0,
+                "instructor_hours": fl.instructor_hours or 0.0,
+                "nvg_unaided_hl_hours": fl.nvg_unaided_hl_hours or 0.0,
+                "nvg_unaided_ll_hours": fl.nvg_unaided_ll_hours or 0.0,
+                "nvg_tactical_hl_hours": fl.nvg_tactical_hl_hours or 0.0,
+                "nvg_tactical_ll_hours": fl.nvg_tactical_ll_hours or 0.0,
                 "syllabus_event_completed": fl.syllabus_event_completed,
+                "instructor_remarks": fl.instructor_remarks,
+                "special_crew_time_hours": fl.special_crew_time_hours,
+                "data_provenance": fl.data_provenance,
+                "instrument_approaches": [],
             })
             for fl in s.flight_logs
         ],
@@ -67,6 +82,7 @@ def _load_sortie_full(db: Session, sortie_id: int) -> Sortie:
         .options(
             joinedload(Sortie.aircraft),
             joinedload(Sortie.flight_logs).joinedload(FlightLog.person),
+            joinedload(Sortie.sortie_tmr_codes).joinedload(SortieTmrCode.tmr_code),
         )
         .filter(Sortie.id == sortie_id)
         .first()
@@ -334,6 +350,23 @@ def get_logbook(
     if flight_mode is not None:
         display_logs = [fl for fl in display_logs if fl.sortie.flight_mode == flight_mode]
 
+    # Batch-fetch TMR codes for displayed sorties (one query, no N+1)
+    display_sortie_ids = [fl.sortie_id for fl in display_logs]
+    tmr_by_sortie: dict[int, List[LogbookTmrOut]] = {}
+    if display_sortie_ids:
+        tmr_rows = (
+            db.query(SortieTmrCode)
+            .options(joinedload(SortieTmrCode.tmr_code))
+            .filter(SortieTmrCode.sortie_id.in_(display_sortie_ids))
+            .order_by(SortieTmrCode.slot)
+            .all()
+        )
+        for stc in tmr_rows:
+            if stc.tmr_code:
+                tmr_by_sortie.setdefault(stc.sortie_id, []).append(
+                    LogbookTmrOut(code=stc.tmr_code.code, slot=stc.slot, hours=stc.hours)
+                )
+
     # Build entry list
     entries: List[LogbookEntry] = []
     for fl in display_logs:
@@ -351,13 +384,21 @@ def get_logbook(
             crew_position=fl.crew_position.value,
             departure_location=s.departure_location,
             arrival_location=s.arrival_location,
-            total_hours=s.duration_hours or 0.0,
-            day_hours=s.day_hours or 0.0,
-            night_hours=s.night_hours or 0.0,
-            nvg_hours=s.nvg_hours or 0.0,
-            instrument_hours_actual=s.instrument_hours or 0.0,
-            instrument_hours_simulated=s.instrument_hours_simulated or 0.0,
+            total_hours=fl.total_hours or fl.hours_logged,
+            night_hours=fl.night_hours or 0.0,
+            nvg_hours=fl.nvg_hours or 0.0,
+            actual_instrument_hours=fl.actual_instrument_hours or 0.0,
+            sim_instrument_hours=fl.sim_instrument_hours or 0.0,
+            first_pilot_hours=fl.first_pilot_hours or 0.0,
+            copilot_hours=fl.copilot_hours or 0.0,
+            ac_commander_hours=fl.ac_commander_hours or 0.0,
+            mission_commander_hours=fl.mission_commander_hours or 0.0,
+            instructor_hours=fl.instructor_hours or 0.0,
             special_crew_time_hours=fl.special_crew_time_hours or 0.0,
+            nvg_unaided_hl_hours=fl.nvg_unaided_hl_hours or 0.0,
+            nvg_unaided_ll_hours=fl.nvg_unaided_ll_hours or 0.0,
+            nvg_tactical_hl_hours=fl.nvg_tactical_hl_hours or 0.0,
+            nvg_tactical_ll_hours=fl.nvg_tactical_ll_hours or 0.0,
             landings_day=s.landings_day or 0,
             landings_night=s.landings_night or 0,
             landings_dve_day=s.landings_dve_day or 0,
@@ -374,7 +415,9 @@ def get_logbook(
                 )
                 for appr in fl.instrument_approaches
             ],
+            tmr_codes=tmr_by_sortie.get(s.id, []),
             remarks=fl.instructor_remarks or s.debrief_notes or None,
+            data_provenance=fl.data_provenance.value if fl.data_provenance else None,
         ))
 
     # Fixed-window totals (independent of user filter)

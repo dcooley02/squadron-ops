@@ -10,29 +10,32 @@ _ALL_APPROACH_TYPES = ["ILS", "GPS", "RNAV", "TACAN", "VOR", "PAR", "ASR", "ENRO
 def compute_totals(logs: list) -> dict:
     """
     Aggregate FlightLog rows into a LogbookTotals-compatible dict.
-
-    Hours allocation: each log's contribution to day/night/NVG/instrument is
-    scaled by (hours_logged / sortie.duration_hours). This handles partial-flight
-    cases correctly. Landings are sortie-level events summed at face value.
+    All hour values come from per-crewmember FlightLog columns.
+    Landings remain sortie-level events summed at face value.
     """
     total_hours = 0.0
-    day_hours = night_hours = nvg_hours = instr_actual = instr_sim = 0.0
+    night_hours = nvg_hours = instr_actual = instr_sim = 0.0
+    fp_hours = cp_hours = hac_hours = mc_hours = instr_role = spec_crew = 0.0
     ldg_day = ldg_night = ldg_dve_day = ldg_dve_night = ldg_ship_day = ldg_ship_night = 0
     approaches_total = 0
     approaches_by_type: dict[str, int] = {t: 0 for t in _ALL_APPROACH_TYPES}
     sortie_ids: set[int] = set()
+    provenance_counts: dict[str, int] = {}
 
     for fl in logs:
         s = fl.sortie
-        dur = s.duration_hours or 0.0
-        ratio = fl.hours_logged / dur if dur > 0 else 1.0
 
-        total_hours  += fl.hours_logged
-        day_hours    += (s.day_hours or 0.0) * ratio
-        night_hours  += (s.night_hours or 0.0) * ratio
-        nvg_hours    += (s.nvg_hours or 0.0) * ratio
-        instr_actual += (s.instrument_hours or 0.0) * ratio
-        instr_sim    += (s.instrument_hours_simulated or 0.0) * ratio
+        total_hours  += fl.total_hours or fl.hours_logged
+        night_hours  += fl.night_hours or 0.0
+        nvg_hours    += fl.nvg_hours or 0.0
+        instr_actual += fl.actual_instrument_hours or 0.0
+        instr_sim    += fl.sim_instrument_hours or 0.0
+        fp_hours     += fl.first_pilot_hours or 0.0
+        cp_hours     += fl.copilot_hours or 0.0
+        hac_hours    += fl.ac_commander_hours or 0.0
+        mc_hours     += fl.mission_commander_hours or 0.0
+        instr_role   += fl.instructor_hours or 0.0
+        spec_crew    += fl.special_crew_time_hours or 0.0
 
         ldg_day       += s.landings_day or 0
         ldg_night     += s.landings_night or 0
@@ -49,23 +52,32 @@ def compute_totals(logs: list) -> dict:
 
         sortie_ids.add(s.id)
 
+        prov = fl.data_provenance.value if fl.data_provenance else "ENTERED"
+        provenance_counts[prov] = provenance_counts.get(prov, 0) + 1
+
     return {
-        "total_hours":               round(total_hours, 1),
-        "day_hours":                 round(day_hours, 1),
-        "night_hours":               round(night_hours, 1),
-        "nvg_hours":                 round(nvg_hours, 1),
-        "instrument_hours_actual":   round(instr_actual, 1),
-        "instrument_hours_simulated": round(instr_sim, 1),
-        "landings_day":              ldg_day,
-        "landings_night":            ldg_night,
-        "landings_dve_day":          ldg_dve_day,
-        "landings_dve_night":        ldg_dve_night,
-        "landings_shipboard_day":    ldg_ship_day,
-        "landings_shipboard_night":  ldg_ship_night,
-        "approaches_total":          approaches_total,
-        "approaches_by_type":        approaches_by_type,
-        "sortie_count":              len(sortie_ids),
-        "flight_log_count":          len(logs),
+        "total_hours":                  round(total_hours, 1),
+        "night_hours":                  round(night_hours, 1),
+        "nvg_hours":                    round(nvg_hours, 1),
+        "total_actual_instrument_hours": round(instr_actual, 1),
+        "total_sim_instrument_hours":   round(instr_sim, 1),
+        "total_first_pilot_hours":      round(fp_hours, 1),
+        "total_copilot_hours":          round(cp_hours, 1),
+        "total_ac_commander_hours":     round(hac_hours, 1),
+        "total_mission_commander_hours": round(mc_hours, 1),
+        "total_instructor_hours":       round(instr_role, 1),
+        "total_spec_crew_hours":        round(spec_crew, 1),
+        "landings_day":                 ldg_day,
+        "landings_night":               ldg_night,
+        "landings_dve_day":             ldg_dve_day,
+        "landings_dve_night":           ldg_dve_night,
+        "landings_shipboard_day":       ldg_ship_day,
+        "landings_shipboard_night":     ldg_ship_night,
+        "approaches_total":             approaches_total,
+        "approaches_by_type":           approaches_by_type,
+        "sortie_count":                 len(sortie_ids),
+        "flight_log_count":             len(logs),
+        "data_provenance_breakdown":    provenance_counts,
     }
 
 

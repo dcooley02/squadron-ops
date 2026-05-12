@@ -182,6 +182,12 @@ class ApproachConditions(str, enum.Enum):
     SIMULATED = "SIMULATED"
 
 
+class DataProvenance(str, enum.Enum):
+    ENTERED             = "ENTERED"              # pilot/crew entered at debrief
+    BACKFILLED          = "BACKFILLED"           # migrated from sortie-level aggregate
+    SYSTEM_CALCULATED   = "SYSTEM_CALCULATED"    # computed by system (e.g. proportional split)
+
+
 # ---------- Core entities ----------
 
 class Person(Base):
@@ -357,10 +363,6 @@ class Sortie(Base):
     takeoff_time = Column(DateTime)
     land_time = Column(DateTime)
     duration_hours = Column(Float, default=0.0)
-    day_hours = Column(Float, default=0.0)
-    night_hours = Column(Float, default=0.0)
-    nvg_hours = Column(Float, default=0.0)
-    instrument_hours = Column(Float, default=0.0)
     notes = Column(Text)
     is_complete = Column(Boolean, default=False, nullable=False)
 
@@ -387,12 +389,10 @@ class Sortie(Base):
     strafe_dry_profiles_night = Column(Integer, nullable=True)
 
     # Logbook / NAVFLIR fields
-    # instrument_hours = actual IMC/partial-panel time; instrument_hours_simulated = SIM/TOFT or safety-pilot time
-    instrument_hours_simulated = Column(Float, default=0.0, nullable=False)
     landings_shipboard_day   = Column(Integer, nullable=True)
     landings_shipboard_night = Column(Integer, nullable=True)
-    departure_location = Column(String(16), nullable=True)   # ICAO code
-    arrival_location   = Column(String(16), nullable=True)   # ICAO code
+    departure_location = Column(String(16), nullable=True)   # ICAO code or hull number
+    arrival_location   = Column(String(16), nullable=True)
 
     aircraft = relationship("Aircraft", back_populates="sorties")
     flight_logs = relationship("FlightLog", back_populates="sortie", cascade="all, delete-orphan")
@@ -401,6 +401,7 @@ class Sortie(Base):
     discrepancies_filed = relationship("Discrepancy", back_populates="sortie", foreign_keys="Discrepancy.sortie_id")
     gradecards = relationship("Gradecard", back_populates="sortie")
     legs = relationship("SortieLeg", back_populates="sortie", cascade="all, delete-orphan", order_by="SortieLeg.leg_number")
+    sortie_tmr_codes = relationship("SortieTmrCode", back_populates="sortie", cascade="all, delete-orphan")
 
 
 class FlightLog(Base):
@@ -417,8 +418,26 @@ class FlightLog(Base):
     instructor_remarks = Column(Text, nullable=True)
     readiness_credits_count = Column(Integer, default=0, nullable=False)
 
+    # Per-crewmember hour categories
+    night_hours              = Column(Float, default=0.0, nullable=False)
+    nvg_hours                = Column(Float, default=0.0, nullable=False)
+    actual_instrument_hours  = Column(Float, default=0.0, nullable=False)   # actual IMC
+    sim_instrument_hours     = Column(Float, default=0.0, nullable=False)   # safety-pilot / TOFT
+    # Role hours (CNAF M-3710.7 categories)
+    total_hours              = Column(Float, default=0.0, nullable=True)
+    first_pilot_hours        = Column(Float, default=0.0, nullable=True)
+    copilot_hours            = Column(Float, default=0.0, nullable=True)
+    ac_commander_hours       = Column(Float, default=0.0, nullable=True)
+    mission_commander_hours  = Column(Float, default=0.0, nullable=True)
+    instructor_hours         = Column(Float, default=0.0, nullable=True)
+    # NVG sub-categories
+    nvg_unaided_hl_hours     = Column(Float, default=0.0, nullable=True)
+    nvg_unaided_ll_hours     = Column(Float, default=0.0, nullable=True)
+    nvg_tactical_hl_hours    = Column(Float, default=0.0, nullable=True)
+    nvg_tactical_ll_hours    = Column(Float, default=0.0, nullable=True)
     # Logbook / NAVFLIR fields
-    special_crew_time_hours = Column(Float, default=0.0, nullable=False)
+    special_crew_time_hours  = Column(Float, default=0.0, nullable=False)   # maps to 3710.7 "Spec Crw" / SCT
+    data_provenance = Column(SQLEnum(DataProvenance), default=DataProvenance.ENTERED, nullable=False)
 
     sortie = relationship("Sortie", back_populates="flight_logs")
     person = relationship("Person", back_populates="flight_logs")
@@ -631,3 +650,33 @@ class InstrumentApproach(Base):
 
     flight_log = relationship("FlightLog", back_populates="instrument_approaches")
     sortie = relationship("Sortie")
+
+
+# ---------- TMR (Training and Readiness) code catalog ----------
+
+class TmrCode(Base):
+    """CNAF M-3710.7 Appendix D Training and Readiness Matrix code definition."""
+    __tablename__ = "tmr_codes"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(4), unique=True, nullable=False, index=True)  # e.g. "1A1"
+    fpc = Column(String(1), nullable=False)    # Functional Performance Code
+    gpc = Column(String(1), nullable=False)    # Grouping Performance Code
+    spc = Column(String(1), nullable=False)    # Sub-grouping Performance Code
+    description = Column(String, nullable=False)
+    capability_area = Column(SQLEnum(CapabilityArea), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+
+class SortieTmrCode(Base):
+    """Junction: TMR codes logged for a sortie (up to 3 slots per CNAF M-3710.7 Appendix D)."""
+    __tablename__ = "sortie_tmr_codes"
+
+    id = Column(Integer, primary_key=True)
+    sortie_id = Column(Integer, ForeignKey("sorties.id"), nullable=False, index=True)
+    tmr_code_id = Column(Integer, ForeignKey("tmr_codes.id"), nullable=False, index=True)
+    slot = Column(Integer, nullable=False)   # MSN slot: 1, 2, or 3
+    hours = Column(Float, nullable=True)
+
+    sortie = relationship("Sortie", back_populates="sortie_tmr_codes")
+    tmr_code = relationship("TmrCode")

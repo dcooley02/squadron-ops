@@ -4,10 +4,10 @@ from sqlalchemy import and_
 from datetime import date, datetime, time as dt_time
 from typing import List, Optional
 from app.database import get_db
-from app.models.models import Sortie, FlightLog, SortieTaskCredit, SortieLeg, InstrumentApproach
+from app.models.models import Sortie, FlightLog, SortieTaskCredit, SortieLeg, InstrumentApproach, SortieTmrCode
 from app.schemas.sorties import (
     SortieSummary, SortieDetail, FlightLogOut, SortieTaskCreditOut,
-    SortieLegRead, InstrumentApproachRead,
+    SortieLegRead, InstrumentApproachRead, SortieTmrOut,
 )
 
 router = APIRouter(prefix="/api/sorties", tags=["sorties"])
@@ -59,8 +59,24 @@ def _log_out(fl: FlightLog) -> FlightLogOut:
         "person_name": f"{fl.person.last_name}, {fl.person.first_name}",
         "crew_position": fl.crew_position,
         "hours_logged": fl.hours_logged,
+        "night_hours": fl.night_hours,
+        "nvg_hours": fl.nvg_hours,
+        "actual_instrument_hours": fl.actual_instrument_hours,
+        "sim_instrument_hours": fl.sim_instrument_hours,
+        "total_hours": fl.total_hours or fl.hours_logged,
+        "first_pilot_hours": fl.first_pilot_hours or 0.0,
+        "copilot_hours": fl.copilot_hours or 0.0,
+        "ac_commander_hours": fl.ac_commander_hours or 0.0,
+        "mission_commander_hours": fl.mission_commander_hours or 0.0,
+        "instructor_hours": fl.instructor_hours or 0.0,
+        "nvg_unaided_hl_hours": fl.nvg_unaided_hl_hours or 0.0,
+        "nvg_unaided_ll_hours": fl.nvg_unaided_ll_hours or 0.0,
+        "nvg_tactical_hl_hours": fl.nvg_tactical_hl_hours or 0.0,
+        "nvg_tactical_ll_hours": fl.nvg_tactical_ll_hours or 0.0,
         "syllabus_event_completed": fl.syllabus_event_completed,
+        "instructor_remarks": fl.instructor_remarks,
         "special_crew_time_hours": fl.special_crew_time_hours,
+        "data_provenance": fl.data_provenance,
         "instrument_approaches": [_approach_out(a) for a in fl.instrument_approaches],
     })
 
@@ -101,7 +117,7 @@ def _credit_out(tc: SortieTaskCredit) -> SortieTaskCreditOut:
 
 @router.get("/{sortie_id}", response_model=SortieDetail)
 def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
-    """Get one sortie with full hour breakdown, crew, and task credits."""
+    """Get one sortie with full hour breakdown, crew, TMR codes, and task credits."""
     s = (
         db.query(Sortie)
         .options(
@@ -112,12 +128,24 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
                 .joinedload(SortieTaskCredit.flight_log)
                 .joinedload(FlightLog.person),
             joinedload(Sortie.legs),
+            joinedload(Sortie.sortie_tmr_codes).joinedload(SortieTmrCode.tmr_code),
         )
         .filter(Sortie.id == sortie_id)
         .first()
     )
     if not s:
         raise HTTPException(status_code=404, detail=f"Sortie {sortie_id} not found")
+
+    tmr_codes_out = [
+        SortieTmrOut(
+            code=stc.tmr_code.code,
+            description=stc.tmr_code.description,
+            slot=stc.slot,
+            hours=stc.hours,
+        )
+        for stc in sorted(s.sortie_tmr_codes, key=lambda x: x.slot)
+        if stc.tmr_code
+    ]
 
     return SortieDetail.model_validate({
         "id": s.id,
@@ -130,10 +158,6 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
         "land_time": s.land_time,
         "duration_hours": s.duration_hours,
         "is_complete": s.is_complete,
-        "day_hours": s.day_hours,
-        "night_hours": s.night_hours,
-        "nvg_hours": s.nvg_hours,
-        "instrument_hours": s.instrument_hours,
         "debrief_notes": s.debrief_notes,
         "notes": s.notes,
         "flight_mode": s.flight_mode,
@@ -152,7 +176,6 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
         "amns_ntrs": s.amns_ntrs,
         "strafe_dry_profiles_day": s.strafe_dry_profiles_day,
         "strafe_dry_profiles_night": s.strafe_dry_profiles_night,
-        "instrument_hours_simulated": s.instrument_hours_simulated,
         "landings_shipboard_day": s.landings_shipboard_day,
         "landings_shipboard_night": s.landings_shipboard_night,
         "departure_location": s.departure_location,
@@ -160,4 +183,5 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
         "legs": [_leg_out(leg) for leg in s.legs],
         "flight_logs": [_log_out(fl) for fl in s.flight_logs],
         "task_credits": [_credit_out(tc) for tc in s.task_credits],
+        "tmr_codes": tmr_codes_out,
     })

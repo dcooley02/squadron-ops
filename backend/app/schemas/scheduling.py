@@ -33,10 +33,6 @@ class SortieCreate(BaseModel):
     takeoff_time: datetime
     land_time: Optional[datetime] = None
     duration_hours: Optional[float] = None
-    day_hours: Optional[float] = 0.0
-    night_hours: Optional[float] = 0.0
-    nvg_hours: Optional[float] = 0.0
-    instrument_hours: Optional[float] = 0.0
     notes: Optional[str] = None
 
 
