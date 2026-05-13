@@ -681,6 +681,28 @@ export const fetchSafetyReportsForSortie = async (
   return data;
 };
 
+export interface AuditLogEntry {
+  id: number;
+  ts: string;
+  actor: string | null;
+  method: string;
+  path: string;
+  query_string: string | null;
+  response_status: number;
+  request_body: unknown;
+  client_host: string | null;
+  duration_ms: number | null;
+}
+
+export const fetchAuditLog = async (params?: {
+  method?: string;
+  path_contains?: string;
+  limit?: number;
+}): Promise<AuditLogEntry[]> => {
+  const { data } = await api.get<AuditLogEntry[]>("/api/audit", { params });
+  return data;
+};
+
 export const fetchAircraftAdb = async (aircraftId: number): Promise<Discrepancy[]> => {
   const { data } = await api.get<Discrepancy[]>(
     `/api/logging/aircraft/${aircraftId}/adb`
