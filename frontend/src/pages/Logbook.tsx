@@ -336,14 +336,17 @@ export default function Logbook() {
                 ))}
               </select>
             </div>
-            {hasFilter && (
-              <button
-                onClick={clearFilters}
-                className="px-3 py-1 text-xs rounded border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors self-end"
-              >
-                Clear
-              </button>
-            )}
+            <button
+              onClick={clearFilters}
+              disabled={!hasFilter}
+              className={
+                hasFilter
+                  ? "px-3 py-1 text-xs rounded border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors self-end"
+                  : "px-3 py-1 text-xs rounded border border-slate-800 text-slate-600 cursor-not-allowed self-end"
+              }
+            >
+              Clear
+            </button>
           </div>
         </div>
 
@@ -360,9 +363,9 @@ export default function Logbook() {
                   >
                     Date{" "}
                     {sortDir === "desc" ? (
-                      <ChevronDown size={11} className="inline" />
+                      <ChevronDown size={14} className="inline text-blue-400" />
                     ) : (
-                      <ChevronUp size={11} className="inline" />
+                      <ChevronUp size={14} className="inline text-blue-400" />
                     )}
                   </th>
                   <th className="text-left px-2 py-2 font-medium" style={{ width: "80px" }}>
@@ -480,21 +483,24 @@ export default function Logbook() {
                   </tr>
                 )}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-700 bg-slate-900/60">
+                  <td
+                    colSpan={13}
+                    className="px-3 py-2 text-xs text-slate-400 font-semibold"
+                  >
+                    Filtered Total —{" "}
+                    <span className="text-slate-200">{footerTotals.count}</span>{" "}
+                    {footerTotals.count === 1 ? "entry" : "entries"},{" "}
+                    <span className="text-slate-200">{footerTotals.total_hours.toFixed(1)}</span> hrs,{" "}
+                    <span className="text-slate-200">{footerTotals.instrument_hours.toFixed(1)}</span> inst,{" "}
+                    <span className="text-slate-200">{footerTotals.night_hours.toFixed(1)}</span> night,{" "}
+                    <span className="text-slate-200">{footerTotals.nvg_hours.toFixed(1)}</span> NVG
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
-
-          {/* ── Footer row ── */}
-          {entries.length > 0 && (
-            <div className="border-t border-slate-800 px-4 py-2 bg-slate-900/60 text-xs text-slate-400">
-              Filtered Total —{" "}
-              <span className="text-slate-200">{footerTotals.count}</span>{" "}
-              {footerTotals.count === 1 ? "entry" : "entries"},{" "}
-              <span className="text-slate-200">{footerTotals.total_hours.toFixed(1)}</span> hrs,{" "}
-              <span className="text-slate-200">{footerTotals.instrument_hours.toFixed(1)}</span> inst,{" "}
-              <span className="text-slate-200">{footerTotals.night_hours.toFixed(1)}</span> night,{" "}
-              <span className="text-slate-200">{footerTotals.nvg_hours.toFixed(1)}</span> NVG
-            </div>
-          )}
         </div>
       </div>
 
