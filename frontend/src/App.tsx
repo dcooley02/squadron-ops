@@ -16,6 +16,7 @@ import Admin from "./pages/Admin";
 import Maintenance from "./pages/Maintenance";
 import AircraftMaintenance from "./pages/AircraftMaintenance";
 import CompleteSortie from "./pages/CompleteSortie";
+import Logbook from "./pages/Logbook";
 import BoardIndex from "./pages/BoardIndex";
 import OpsBoard from "./board/OpsBoard";
 import MaintenanceBoard from "./board/MaintenanceBoard";
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/sorties" element={<Sorties />} />
             <Route path="/sorties/:id" element={<SortieDetail />} />
             <Route path="/sorties/:id/complete" element={<CompleteSortie />} />
+            <Route path="/logbook/:personId" element={<Logbook />} />
             <Route path="/schedule" element={<Schedule />} />
             <Route path="/training" element={<Training />} />
             <Route path="/training/gradecard/:id" element={<GradecardDetail />} />

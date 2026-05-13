@@ -45,9 +45,6 @@ export default function Dashboard() {
   const pmcCount = details.length > 0
     ? details.filter((a) => a.computed_status === "PMC").length
     : data.aircraft_pmc_count;
-  const nmcCount = details.length > 0
-    ? details.filter((a) => a.computed_status === "NMC" || a.computed_status === "NMCM" || a.computed_status === "NMCS").length
-    : data.aircraft_nmc_count;
   const nmcmCount = details.filter((a) => a.computed_status === "NMCM").length;
   const nmcsCount = details.filter((a) => a.computed_status === "NMCS").length;
   const computedFmcRate = data.aircraft_total > 0

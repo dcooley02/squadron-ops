@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BookOpen } from "lucide-react";
 import { fetchPerson, type CurrencyOut } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
@@ -52,9 +52,17 @@ export default function CrewDetail() {
               <span className="capitalize">{data.role.replace("_", " ")}</span>
             </div>
           </div>
-          <Badge variant={data.is_active ? "success" : "neutral"}>
-            {data.is_active ? "Active" : "Inactive"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/logbook/${data.id}`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors border border-slate-700"
+            >
+              <BookOpen size={14} /> View Logbook
+            </Link>
+            <Badge variant={data.is_active ? "success" : "neutral"}>
+              {data.is_active ? "Active" : "Inactive"}
+            </Badge>
+          </div>
         </div>
       </div>
 

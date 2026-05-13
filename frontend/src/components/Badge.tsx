@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
 type BadgeVariant = "neutral" | "success" | "warning" | "danger" | "info";
 

@@ -65,7 +65,6 @@ export default function Maintenance() {
           </div>
           <div className="space-y-1">
             {driftingAircraft.map((ac) => {
-              const overdueDowning = (ac as AircraftDetail & { inspections?: unknown[] });
               return (
                 <div key={ac.id} className="text-xs text-yellow-300/80 flex items-center gap-2">
                   <span className="font-mono">{ac.side_number ?? ac.bureau_number}</span>
