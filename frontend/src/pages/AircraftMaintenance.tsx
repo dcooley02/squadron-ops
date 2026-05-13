@@ -368,6 +368,22 @@ function DiscrepancyRow({ disc, showHistory }: { disc: Discrepancy; showHistory?
               <Badge variant={WS_VARIANT[disc.work_status]}>
                 {WS_LABEL[disc.work_status]}
               </Badge>
+              {disc.type_wo_code && (
+                <span
+                  className="font-mono text-[10px] uppercase tracking-wide text-slate-300 bg-slate-800 border border-slate-700 rounded px-1 py-0.5"
+                  title="CNAF M-4790.2 Type Work Order"
+                >
+                  WO·{disc.type_wo_code}
+                </span>
+              )}
+              {disc.jcn && (
+                <span
+                  className="font-mono text-[10px] text-slate-400"
+                  title="Job Control Number — CNAF M-4790.2"
+                >
+                  JCN {disc.jcn}
+                </span>
+              )}
               {disc.system_affected && (
                 <span className="text-xs text-slate-400 font-mono">{disc.system_affected}</span>
               )}

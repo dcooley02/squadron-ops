@@ -507,6 +507,9 @@ class Discrepancy(Base):
     work_status = Column(SQLEnum(DiscrepancyWorkStatus), default=DiscrepancyWorkStatus.OPEN, nullable=False)
     system_affected = Column(String, nullable=True)
     corrective_action = Column(Text, nullable=True)
+    # CNAF M-4790.2 work-order discrimination
+    type_wo_code = Column(String(2), nullable=True)
+    jcn = Column(String(9), nullable=True, index=True)
 
     # New in flight-logging
     sortie_id = Column(Integer, ForeignKey("sorties.id"), nullable=True, index=True)

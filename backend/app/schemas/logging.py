@@ -56,6 +56,7 @@ class DiscrepancyCreate(BaseModel):
     severity: DiscrepancySeverity
     system_affected: Optional[str] = None
     notes: Optional[str] = None
+    type_wo_code: Optional[str] = None
 
 
 class SafetyReportCreate(BaseModel):

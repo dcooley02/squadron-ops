@@ -20,6 +20,9 @@ class DiscrepancyOut(BaseModel):
     is_open: bool
     opened_date: datetime
     closed_date: Optional[datetime] = None
+    # CNAF M-4790.2
+    type_wo_code: Optional[str] = None
+    jcn: Optional[str] = None
 
 
 class DiscrepancyCreate(BaseModel):
@@ -30,6 +33,7 @@ class DiscrepancyCreate(BaseModel):
     work_status: DiscrepancyWorkStatus = DiscrepancyWorkStatus.OPEN
     system_affected: Optional[str] = None
     corrective_action: Optional[str] = None
+    type_wo_code: Optional[str] = None
 
 
 class DiscrepancyUpdate(BaseModel):

@@ -184,6 +184,22 @@ export default function AircraftDetail() {
                       )}
                       <Badge variant={SEV_VARIANT[d.severity]}>{d.severity}</Badge>
                       <Badge variant={WS_VARIANT[d.work_status]}>{WS_LABEL[d.work_status]}</Badge>
+                      {d.type_wo_code && (
+                        <span
+                          className="font-mono text-[10px] uppercase tracking-wide text-slate-300 bg-slate-800 border border-slate-700 rounded px-1 py-0.5"
+                          title="CNAF M-4790.2 Type Work Order"
+                        >
+                          WO·{d.type_wo_code}
+                        </span>
+                      )}
+                      {d.jcn && (
+                        <span
+                          className="font-mono text-[10px] text-slate-400"
+                          title="Job Control Number — CNAF M-4790.2"
+                        >
+                          JCN {d.jcn}
+                        </span>
+                      )}
                       {d.system_affected && (
                         <span className="text-xs text-slate-400 font-mono">{d.system_affected}</span>
                       )}
@@ -309,6 +325,22 @@ function AdbCard({ adb }: { adb: Discrepancy[] | undefined }) {
                 )}
                 <Badge variant={SEV_VARIANT[d.severity]}>{d.severity}</Badge>
                 <Badge variant={WS_VARIANT[d.work_status]}>{WS_LABEL[d.work_status]}</Badge>
+                {d.type_wo_code && (
+                  <span
+                    className="font-mono text-[10px] uppercase tracking-wide text-slate-300 bg-slate-800 border border-slate-700 rounded px-1 py-0.5"
+                    title="CNAF M-4790.2 Type Work Order"
+                  >
+                    WO·{d.type_wo_code}
+                  </span>
+                )}
+                {d.jcn && (
+                  <span
+                    className="font-mono text-[10px] text-slate-400"
+                    title="Job Control Number — CNAF M-4790.2"
+                  >
+                    JCN {d.jcn}
+                  </span>
+                )}
                 {d.system_affected && (
                   <span className="text-xs text-slate-400 font-mono">{d.system_affected}</span>
                 )}

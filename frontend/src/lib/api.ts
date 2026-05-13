@@ -81,6 +81,9 @@ export interface Discrepancy {
   is_open: boolean;
   opened_date: string;
   closed_date?: string | null;
+  // CNAF M-4790.2
+  type_wo_code?: string | null;
+  jcn?: string | null;
 }
 
 // backward compat alias

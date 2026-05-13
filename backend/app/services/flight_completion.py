@@ -20,6 +20,7 @@ from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
 from app.schemas.scheduling import FlightLogCreate
 from app.services.currency_applicability import currencies_for_person
 from app.services.currency_renewal_rules import RENEWAL_RULES
+from app.services.jcn import assign_jcn
 
 
 def _upsert_currency_typed(
@@ -255,6 +256,8 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             )
         ).scalar()
         maf = f"M-{year}-{(max_seq or 0) + 1:04d}"
+        opened = datetime.utcnow()
+        jcn = assign_jcn(db, opened_date=opened, model=Discrepancy)
         db.add(Discrepancy(
             aircraft_id=sortie.aircraft_id,
             sortie_id=sortie.id,
@@ -264,11 +267,13 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             system_affected=disc_spec.system_affected,
             notes=disc_spec.notes,
             maf_number=maf,
+            type_wo_code=disc_spec.type_wo_code or "DM",
+            jcn=jcn,
             work_status=DiscrepancyWorkStatus.OPEN,
-            opened_date=datetime.utcnow(),
+            opened_date=opened,
             is_open=True,
         ))
-        db.flush()  # make the new row visible for the next MAX query
+        db.flush()  # make the new row visible for the next MAX query and JCN sequence
 
     # ── Step 9: insert SafetyReport rows ────────────────────────────────────────
     for sr_spec in payload.safety_reports:
