@@ -34,9 +34,17 @@ export default function Schedule() {
   });
 
   const fitnessById: Record<number, "green" | "yellow" | "red"> = {};
+  const topWarningById: Record<number, { severity: "red" | "yellow"; message: string } | null> = {};
   (sorties ?? []).forEach((s, i) => {
     const result = fitnessQueries[i]?.data;
-    if (result) fitnessById[s.id] = result.overall_status;
+    if (result) {
+      fitnessById[s.id] = result.overall_status;
+      const top =
+        result.warnings.find((w) => w.severity === "red") ??
+        result.warnings.find((w) => w.severity === "yellow") ??
+        null;
+      topWarningById[s.id] = top;
+    }
   });
 
   const visibleSorties = (sorties ?? []).filter((s) => !deletedIds.has(s.id));
@@ -73,10 +81,29 @@ export default function Schedule() {
             const daySorties = sortiesForDay(visibleSorties, day);
             const isSelected = isSameDay(day, selectedDay);
             const isToday = isSameDay(day, today);
+            const dayCounts = daySorties.reduce(
+              (acc, s) => {
+                const fc = fitnessById[s.id] ?? "green";
+                acc[fc] = (acc[fc] ?? 0) + 1;
+                return acc;
+              },
+              { green: 0, yellow: 0, red: 0 } as Record<"green" | "yellow" | "red", number>
+            );
+            const topRed = daySorties
+              .map((s) => topWarningById[s.id])
+              .find((w) => w && w.severity === "red");
+            const titleLines = daySorties.length
+              ? `${daySorties.length} sortie${daySorties.length === 1 ? "" : "s"}${
+                  dayCounts.red ? ` · ${dayCounts.red} red` : ""
+                }${dayCounts.yellow ? ` · ${dayCounts.yellow} yellow` : ""}${
+                  topRed ? `\n${topRed.message}` : ""
+                }`
+              : "No flights";
             return (
               <button
                 key={day.toISOString()}
                 onClick={() => setSelectedDay(day)}
+                title={titleLines}
                 className={`rounded-lg p-2 text-center transition-colors border ${
                   isSelected
                     ? "bg-slate-700 border-slate-500"
@@ -114,6 +141,16 @@ export default function Schedule() {
                     );
                   })}
                 </div>
+                {(dayCounts.red > 0 || dayCounts.yellow > 0) && (
+                  <div className="mt-1 flex justify-center gap-1.5 text-[10px] font-medium">
+                    {dayCounts.red > 0 && (
+                      <span className="text-red-400">{dayCounts.red}R</span>
+                    )}
+                    {dayCounts.yellow > 0 && (
+                      <span className="text-yellow-400">{dayCounts.yellow}Y</span>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}

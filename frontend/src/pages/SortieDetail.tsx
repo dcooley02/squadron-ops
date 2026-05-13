@@ -2,7 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { fetchSortie, type CrewPosition, type SortieDetail as SortieDetailType } from "../lib/api";
+import {
+  fetchSortie,
+  type CrewPosition,
+  type SortieDetail as SortieDetailType,
+  type FlightLogOut,
+} from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
 
@@ -136,6 +141,39 @@ export default function SortieDetail() {
         </div>
       )}
 
+      {/* TMR Codes */}
+      {data.tmr_codes && data.tmr_codes.length > 0 && (
+        <div className="card">
+          <h2 className="mb-3">TMR Codes</h2>
+          <div className="space-y-1.5">
+            {data.tmr_codes
+              .slice()
+              .sort((a, b) => a.slot - b.slot)
+              .map((t) => (
+                <div
+                  key={t.slot}
+                  className="flex items-center gap-3 py-1.5 border-b border-slate-800 last:border-0"
+                >
+                  <span className="text-xs text-slate-500 font-medium w-12 shrink-0">
+                    Slot {t.slot}
+                  </span>
+                  <span className="font-mono text-sm font-semibold text-slate-200 w-14 shrink-0">
+                    {t.code}
+                  </span>
+                  <span className="text-sm text-slate-300 flex-1 min-w-0 truncate">
+                    {t.description ?? "—"}
+                  </span>
+                  {t.hours != null && (
+                    <span className="text-sm text-slate-400 shrink-0">
+                      {t.hours.toFixed(1)} hrs
+                    </span>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Crew */}
       <div className="card">
         <h2 className="mb-3">Crew</h2>
@@ -144,25 +182,7 @@ export default function SortieDetail() {
         ) : (
           <div className="space-y-0">
             {data.flight_logs.map((fl) => (
-              <div
-                key={fl.id}
-                className="flex items-center justify-between py-2.5 border-b border-slate-800 last:border-0"
-              >
-                <div className="flex items-center gap-3">
-                  <Badge variant={POSITION_BADGE_VARIANT[fl.crew_position]}>
-                    {fl.crew_position.replace(/_/g, " ")}
-                  </Badge>
-                  <div>
-                    <div className="font-medium text-sm">{fl.person_name}</div>
-                    {fl.syllabus_event_completed && (
-                      <div className="text-xs text-slate-500 mt-0.5">
-                        Completed: {fl.syllabus_event_completed}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="text-sm text-slate-400">{fl.hours_logged.toFixed(1)} hrs</div>
-              </div>
+              <CrewRow key={fl.id} fl={fl} />
             ))}
           </div>
         )}
@@ -206,6 +226,75 @@ export default function SortieDetail() {
         <div className="card">
           <h2 className="mb-2">Debrief Notes</h2>
           <p className="text-sm text-slate-300 whitespace-pre-wrap">{data.debrief_notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CrewRow({ fl }: { fl: FlightLogOut }) {
+  const approaches = fl.instrument_approaches ?? [];
+  const hasDetail = approaches.length > 0 || !!fl.instructor_remarks;
+  return (
+    <div className="py-2.5 border-b border-slate-800 last:border-0">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Badge variant={POSITION_BADGE_VARIANT[fl.crew_position]}>
+            {fl.crew_position.replace(/_/g, " ")}
+          </Badge>
+          <div className="min-w-0">
+            <div className="font-medium text-sm flex items-center gap-2">
+              {fl.person_name}
+              {fl.data_provenance === "BACKFILLED" && (
+                <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1 py-0.5">
+                  backfilled
+                </span>
+              )}
+            </div>
+            {fl.syllabus_event_completed && (
+              <div className="text-xs text-slate-500 mt-0.5">
+                Completed: {fl.syllabus_event_completed}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="text-sm text-slate-400 shrink-0">{fl.hours_logged.toFixed(1)} hrs</div>
+      </div>
+
+      {hasDetail && (
+        <div className="mt-2 pl-1 space-y-1.5">
+          {approaches.length > 0 && (
+            <div className="flex items-start gap-2 text-xs">
+              <span className="text-slate-500 uppercase tracking-wide shrink-0 w-20">
+                Approaches
+              </span>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {approaches.map((ap) => (
+                  <span key={ap.id} className="text-slate-300">
+                    <span className="font-mono text-slate-200">{ap.approach_type}</span>
+                    {ap.airport_icao && (
+                      <span className="text-slate-400"> @ {ap.airport_icao}</span>
+                    )}
+                    {ap.runway && (
+                      <span className="text-slate-500"> RWY {ap.runway}</span>
+                    )}
+                    <span className="text-slate-500">
+                      {" "}
+                      ({ap.actual_or_simulated === "ACTUAL" ? "A" : "S"})
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {fl.instructor_remarks && (
+            <div className="flex items-start gap-2 text-xs">
+              <span className="text-slate-500 uppercase tracking-wide shrink-0 w-20">
+                Remarks
+              </span>
+              <p className="text-slate-300 italic flex-1">{fl.instructor_remarks}</p>
+            </div>
+          )}
         </div>
       )}
     </div>

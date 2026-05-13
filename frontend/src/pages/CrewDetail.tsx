@@ -1,7 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, BookOpen } from "lucide-react";
-import { fetchPerson, type CurrencyOut } from "../lib/api";
+import {
+  fetchPerson,
+  fetchPersonTrainingJacket,
+  type CurrencyOut,
+  type TrainingJacketEntry,
+} from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
 import { classifyExpiration, daysUntil, formatDate } from "../lib/dates";
@@ -13,6 +18,12 @@ export default function CrewDetail() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["person", personId],
     queryFn: () => fetchPerson(personId),
+    enabled: !isNaN(personId),
+  });
+
+  const { data: trainingJacket } = useQuery({
+    queryKey: ["training-jacket", personId],
+    queryFn: () => fetchPersonTrainingJacket(personId),
     enabled: !isNaN(personId),
   });
 
@@ -120,6 +131,112 @@ export default function CrewDetail() {
           )}
         </div>
       </div>
+
+      {/* Training Jacket */}
+      <TrainingJacketCard entries={trainingJacket} personId={personId} />
+    </div>
+  );
+}
+
+function TrainingJacketCard({
+  entries,
+  personId,
+}: {
+  entries: TrainingJacketEntry[] | undefined;
+  personId: number;
+}) {
+  if (!entries) {
+    return (
+      <div className="card">
+        <h2 className="mb-3">Training Jacket</h2>
+        <p className="text-sm text-slate-500">Loading…</p>
+      </div>
+    );
+  }
+  const recent = entries.slice(0, 15);
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h2>Training Jacket</h2>
+        <Link
+          to={`/logbook/${personId}`}
+          className="text-xs text-slate-400 hover:text-slate-200"
+        >
+          Full logbook →
+        </Link>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-sm text-slate-500">No sorties flown.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
+                <th className="font-medium py-1.5 pr-3">Date</th>
+                <th className="font-medium py-1.5 pr-3">Event</th>
+                <th className="font-medium py-1.5 pr-3">Pos</th>
+                <th className="font-medium py-1.5 pr-3 text-right">Hrs</th>
+                <th className="font-medium py-1.5 pr-3">Mode</th>
+                <th className="font-medium py-1.5 pr-3">Tasks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recent.map((e) => (
+                <tr key={e.sortie_id} className="border-t border-slate-800">
+                  <td className="py-1.5 pr-3 text-slate-300">{formatDate(e.sortie_date)}</td>
+                  <td className="py-1.5 pr-3">
+                    <Link
+                      to={`/sorties/${e.sortie_id}`}
+                      className="text-blue-400 hover:text-blue-300 font-mono text-xs"
+                    >
+                      {e.event_code ?? "—"}
+                    </Link>
+                    {e.event_type && (
+                      <span className="text-xs text-slate-500 ml-2">{e.event_type}</span>
+                    )}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <span className="text-xs text-slate-300">
+                      {e.crew_position.replace(/_/g, " ")}
+                    </span>
+                  </td>
+                  <td className="py-1.5 pr-3 text-right text-slate-300">
+                    {e.hours_logged.toFixed(1)}
+                  </td>
+                  <td className="py-1.5 pr-3 text-xs text-slate-500">
+                    {e.flight_mode ?? "—"}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    {e.task_credits.length === 0 ? (
+                      <span className="text-xs text-slate-600">—</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {e.task_credits.map((tc, i) => (
+                          <span
+                            key={i}
+                            className="font-mono text-xs text-slate-300"
+                            title={tc.grade ?? undefined}
+                          >
+                            {tc.task_code}
+                            {tc.grade && (
+                              <span className="text-slate-500">·{tc.grade}</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {entries.length > recent.length && (
+            <div className="text-xs text-slate-500 mt-2">
+              Showing 15 of {entries.length} sorties — see full logbook.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

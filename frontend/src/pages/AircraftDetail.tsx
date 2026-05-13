@@ -3,13 +3,17 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import {
   fetchAircraftDetail,
+  fetchAircraftAdb,
+  fetchAircraftInspections,
   type AircraftStatus,
   type DiscrepancySeverity,
   type DiscrepancyWorkStatus,
+  type Discrepancy,
+  type AircraftInspection,
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
-import { formatDate } from "../lib/dates";
+import { formatDate, daysUntil } from "../lib/dates";
 
 const STATUS_BADGE_VARIANT: Record<AircraftStatus, "success" | "warning" | "danger"> = {
   FMC: "success",
@@ -50,6 +54,18 @@ export default function AircraftDetail() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["aircraft-detail", aircraftId],
     queryFn: () => fetchAircraftDetail(aircraftId),
+    enabled: !isNaN(aircraftId),
+  });
+
+  const { data: inspections } = useQuery({
+    queryKey: ["aircraft-inspections", aircraftId],
+    queryFn: () => fetchAircraftInspections(aircraftId),
+    enabled: !isNaN(aircraftId),
+  });
+
+  const { data: adb } = useQuery({
+    queryKey: ["aircraft-adb", aircraftId],
+    queryFn: () => fetchAircraftAdb(aircraftId),
     enabled: !isNaN(aircraftId),
   });
 
@@ -135,6 +151,9 @@ export default function AircraftDetail() {
         </div>
       </div>
 
+      {/* Inspections */}
+      <InspectionsCard inspections={inspections} />
+
       {/* Open Discrepancies */}
       <div className="card">
         <div className="flex items-center justify-between mb-3">
@@ -191,6 +210,123 @@ export default function AircraftDetail() {
           </div>
         )}
       </div>
+
+      {/* AADB — Aircraft Auto Discrepancy Book */}
+      <AdbCard adb={adb} />
+    </div>
+  );
+}
+
+function InspectionsCard({ inspections }: { inspections: AircraftInspection[] | undefined }) {
+  if (!inspections) {
+    return (
+      <div className="card">
+        <h2 className="mb-3">Inspections</h2>
+        <p className="text-sm text-slate-500">Loading…</p>
+      </div>
+    );
+  }
+  const order = ["DAILY", "7_DAY", "14_DAY", "28_DAY", "56_DAY", "PHASE", "CALENDAR"];
+  const sorted = [...inspections].sort(
+    (a, b) => order.indexOf(a.inspection_type.code) - order.indexOf(b.inspection_type.code)
+  );
+  return (
+    <div className="card">
+      <h2 className="mb-3">Inspections</h2>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-slate-500">No inspections tracked.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {sorted.map((ins) => (
+            <InspectionTile key={ins.id} ins={ins} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InspectionTile({ ins }: { ins: AircraftInspection }) {
+  const days = daysUntil(ins.next_due_date ?? null);
+  const downing = ins.inspection_type.is_downing_when_overdue;
+  let badge: React.ReactNode = null;
+  if (ins.is_overdue) {
+    badge = <Badge variant={downing ? "danger" : "warning"}>Overdue</Badge>;
+  } else if (days != null && days <= 2) {
+    badge = <Badge variant="warning">{days}d</Badge>;
+  } else if (days != null) {
+    badge = <Badge variant="neutral">{days}d</Badge>;
+  }
+  return (
+    <div className="rounded border border-slate-800 bg-slate-900/50 p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs font-semibold text-slate-200 truncate">
+          {ins.inspection_type.name}
+        </div>
+        {badge}
+      </div>
+      <div className="text-[11px] text-slate-500 mt-1">
+        {ins.last_completed_date && (
+          <>Last {formatDate(ins.last_completed_date)}</>
+        )}
+        {ins.next_due_date && (
+          <div>Due {formatDate(ins.next_due_date)}</div>
+        )}
+        {ins.next_due_hours != null && (
+          <div>Due @ {ins.next_due_hours.toFixed(0)} hrs</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AdbCard({ adb }: { adb: Discrepancy[] | undefined }) {
+  if (!adb) {
+    return (
+      <div className="card">
+        <h2 className="mb-3">AADB · Aircraft Auto Discrepancy Book</h2>
+        <p className="text-sm text-slate-500">Loading…</p>
+      </div>
+    );
+  }
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h2>AADB · Aircraft Auto Discrepancy Book</h2>
+        <span className="text-xs text-slate-500">Recent discrepancies (open + closed)</span>
+      </div>
+      {adb.length === 0 ? (
+        <p className="text-sm text-slate-500">No recent discrepancies.</p>
+      ) : (
+        <div>
+          {adb.map((d) => (
+            <div key={d.id} className="py-2.5 border-b border-slate-800 last:border-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                {d.maf_number && (
+                  <span className="font-mono text-sm font-semibold text-slate-200">
+                    {d.maf_number}
+                  </span>
+                )}
+                <Badge variant={SEV_VARIANT[d.severity]}>{d.severity}</Badge>
+                <Badge variant={WS_VARIANT[d.work_status]}>{WS_LABEL[d.work_status]}</Badge>
+                {d.system_affected && (
+                  <span className="text-xs text-slate-400 font-mono">{d.system_affected}</span>
+                )}
+                <span className="text-xs text-slate-500 ml-auto">
+                  {formatDate(d.opened_date)}
+                  {d.closed_date && <> → {formatDate(d.closed_date)}</>}
+                </span>
+              </div>
+              <p className="text-sm text-slate-300 mt-1">{d.description}</p>
+              {d.corrective_action && (
+                <p className="text-xs text-slate-400 mt-1 italic">
+                  CA: {d.corrective_action}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
