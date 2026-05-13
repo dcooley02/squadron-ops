@@ -80,10 +80,12 @@ def _entry_dict(fl: FlightLog) -> dict:
         "sim_instrument_hours": fl.sim_instrument_hours or 0.0,
         "night_hours": fl.night_hours or 0.0,
         "nvg_hours": fl.nvg_hours or 0.0,
-        "landings_day": s.landings_day or 0,
-        "landings_night": s.landings_night or 0,
-        "landings_shipboard_day": s.landings_shipboard_day or 0,
-        "landings_shipboard_night": s.landings_shipboard_night or 0,
+        # Per-crewmember landings (B1): per-aviator NAVFLIR PDF should not
+        # show sortie rollups; pull from the flight_log row.
+        "landings_day": fl.landings_day or 0,
+        "landings_night": fl.landings_night or 0,
+        "landings_shipboard_day": fl.landings_shipboard_day or 0,
+        "landings_shipboard_night": fl.landings_shipboard_night or 0,
         "approaches": len(fl.instrument_approaches),
         "departure": s.departure_location or "",
         "arrival": s.arrival_location or "",

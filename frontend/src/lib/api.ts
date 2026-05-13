@@ -155,6 +155,13 @@ export interface FlightLogOut {
   nvg_unaided_ll_hours?: number | null;
   nvg_tactical_hl_hours?: number | null;
   nvg_tactical_ll_hours?: number | null;
+  // Per-crewmember landings (B1)
+  landings_day?: number;
+  landings_night?: number;
+  landings_dve_day?: number;
+  landings_dve_night?: number;
+  landings_shipboard_day?: number;
+  landings_shipboard_night?: number;
   instrument_approaches?: InstrumentApproachOut[];
 }
 

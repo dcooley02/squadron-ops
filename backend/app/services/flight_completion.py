@@ -87,6 +87,20 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.landings_night          = payload.landings_night
     sortie.landings_dve_day        = payload.landings_dve_day
     sortie.landings_dve_night      = payload.landings_dve_night
+    # Mirror landings to the HAC's flight_log (per-crew source of truth, B1).
+    # A future CompleteSortie form revision will accept these per-crew rather
+    # than auto-derive them from the sortie totals.
+    _hac = next(
+        (fl for fl in sortie.flight_logs if fl.crew_position == CrewPosition.HAC),
+        None,
+    )
+    if _hac is not None:
+        _hac.landings_day             = payload.landings_day or 0
+        _hac.landings_night           = payload.landings_night or 0
+        _hac.landings_dve_day         = payload.landings_dve_day or 0
+        _hac.landings_dve_night       = payload.landings_dve_night or 0
+        _hac.landings_shipboard_day   = payload.landings_shipboard_day or 0
+        _hac.landings_shipboard_night = payload.landings_shipboard_night or 0
     sortie.hoist_streams           = payload.hoist_streams
     sortie.hoist_recoveries        = payload.hoist_recoveries
     sortie.amns_iterations         = payload.amns_iterations

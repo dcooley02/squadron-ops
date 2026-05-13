@@ -78,6 +78,12 @@ def _log_out(fl: FlightLog) -> FlightLogOut:
         "crew_qual_code": fl.crew_qual_code,
         "special_crew_time_hours": fl.special_crew_time_hours,
         "data_provenance": fl.data_provenance,
+        "landings_day": fl.landings_day or 0,
+        "landings_night": fl.landings_night or 0,
+        "landings_dve_day": fl.landings_dve_day or 0,
+        "landings_dve_night": fl.landings_dve_night or 0,
+        "landings_shipboard_day": fl.landings_shipboard_day or 0,
+        "landings_shipboard_night": fl.landings_shipboard_night or 0,
         "instrument_approaches": [_approach_out(a) for a in fl.instrument_approaches],
     })
 

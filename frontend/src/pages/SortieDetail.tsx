@@ -300,7 +300,19 @@ function SafetyReportsCard({ reports }: { reports: SafetyReport[] }) {
 
 function CrewRow({ fl }: { fl: FlightLogOut }) {
   const approaches = fl.instrument_approaches ?? [];
-  const hasDetail = approaches.length > 0 || !!fl.instructor_remarks;
+  const landingCounts: [string, number][] = [
+    ["D", fl.landings_day ?? 0],
+    ["N", fl.landings_night ?? 0],
+    ["DVE D", fl.landings_dve_day ?? 0],
+    ["DVE N", fl.landings_dve_night ?? 0],
+    ["SHIP D", fl.landings_shipboard_day ?? 0],
+    ["SHIP N", fl.landings_shipboard_night ?? 0],
+  ];
+  const visibleLandings = landingCounts.filter(([, n]) => n > 0);
+  const hasDetail =
+    approaches.length > 0 ||
+    !!fl.instructor_remarks ||
+    visibleLandings.length > 0;
   return (
     <div className="py-2.5 border-b border-slate-800 last:border-0">
       <div className="flex items-center justify-between gap-3">
@@ -337,6 +349,21 @@ function CrewRow({ fl }: { fl: FlightLogOut }) {
 
       {hasDetail && (
         <div className="mt-2 pl-1 space-y-1.5">
+          {visibleLandings.length > 0 && (
+            <div className="flex items-start gap-2 text-xs">
+              <span className="text-slate-500 uppercase tracking-wide shrink-0 w-20">
+                Landings
+              </span>
+              <div className="flex flex-wrap gap-x-3 gap-y-1">
+                {visibleLandings.map(([label, n]) => (
+                  <span key={label} className="text-slate-300">
+                    <span className="font-mono text-slate-200">{n}</span>
+                    <span className="text-slate-500"> {label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
           {approaches.length > 0 && (
             <div className="flex items-start gap-2 text-xs">
               <span className="text-slate-500 uppercase tracking-wide shrink-0 w-20">

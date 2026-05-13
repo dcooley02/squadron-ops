@@ -441,6 +441,13 @@ class FlightLog(Base):
     # Logbook / NAVFLIR fields
     special_crew_time_hours  = Column(Float, default=0.0, nullable=False)   # maps to 3710.7 "Spec Crw" / SCT
     data_provenance = Column(SQLEnum(DataProvenance), default=DataProvenance.ENTERED, nullable=False)
+    # Per-crewmember landings (B1). Sortie-level columns remain as the rollup.
+    landings_day              = Column(Integer, default=0, nullable=False)
+    landings_night            = Column(Integer, default=0, nullable=False)
+    landings_dve_day          = Column(Integer, default=0, nullable=False)
+    landings_dve_night        = Column(Integer, default=0, nullable=False)
+    landings_shipboard_day    = Column(Integer, default=0, nullable=False)
+    landings_shipboard_night  = Column(Integer, default=0, nullable=False)
 
     sortie = relationship("Sortie", back_populates="flight_logs")
     person = relationship("Person", back_populates="flight_logs")
