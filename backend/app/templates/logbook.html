@@ -146,14 +146,17 @@
     /* ── Watermark — position:fixed repeats on every WeasyPrint page ── */
     .watermark {
       position: fixed;
-      top: 42%;
-      left: 50%;
-      transform: translate(-50%, -50%) rotate(-28deg);
-      font-size: 46pt;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      transform: rotate(-30deg);
+      transform-origin: center;
+      margin-top: -1em;
+      font-size: 38pt;
       font-weight: bold;
       color: rgba(160, 0, 0, 0.09);
-      white-space: nowrap;
-      letter-spacing: 1.5pt;
+      letter-spacing: 1pt;
       pointer-events: none;
     }
   </style>
