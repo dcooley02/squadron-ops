@@ -407,10 +407,11 @@ export default function Logbook() {
               <tbody>
                 {entries.map((entry) => {
                   const roleLabel = pilotRoleLabel(entry);
+                  const qual = entry.crew_qual_code;
                   const pilotCell =
                     roleLabel
-                      ? `${entry.total_hours.toFixed(1)} / ${roleLabel}`
-                      : entry.total_hours.toFixed(1);
+                      ? `${entry.total_hours.toFixed(1)} / ${roleLabel}${qual ? ` · ${qual}` : ""}`
+                      : `${entry.total_hours.toFixed(1)}${qual ? ` · ${qual}` : ""}`;
 
                   return (
                     <tr

@@ -40,6 +40,7 @@ def _log_out(fl: FlightLog) -> FlightLogOut:
         "crew_position": fl.crew_position,
         "hours_logged": fl.hours_logged,
         "syllabus_event_completed": fl.syllabus_event_completed,
+        "crew_qual_code": fl.crew_qual_code,
     })
 
 

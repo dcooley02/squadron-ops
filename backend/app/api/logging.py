@@ -84,6 +84,7 @@ def _sortie_detail(s: Sortie) -> SortieDetail:
                 "nvg_tactical_ll_hours": fl.nvg_tactical_ll_hours or 0.0,
                 "syllabus_event_completed": fl.syllabus_event_completed,
                 "instructor_remarks": fl.instructor_remarks,
+                "crew_qual_code": fl.crew_qual_code,
                 "special_crew_time_hours": fl.special_crew_time_hours,
                 "data_provenance": fl.data_provenance,
                 "instrument_approaches": [],
@@ -265,6 +266,7 @@ def get_adb(
 def list_safety_reports(
     status: Optional[str] = Query(None, description="OPEN, UNDER_REVIEW, CLOSED"),
     severity: Optional[str] = Query(None, description="INFO, HAZARD, INCIDENT, MISHAP"),
+    sortie_id: Optional[int] = Query(None, description="Filter to one sortie"),
     db: Session = Depends(get_db),
 ):
     """Return safety reports, newest first."""
@@ -273,6 +275,8 @@ def list_safety_reports(
         q = q.filter(SafetyReport.status == status)
     if severity is not None:
         q = q.filter(SafetyReport.severity == severity)
+    if sortie_id is not None:
+        q = q.filter(SafetyReport.sortie_id == sortie_id)
     return q.order_by(desc(SafetyReport.created_at)).all()
 
 
@@ -400,6 +404,7 @@ def get_logbook(
             event_code=s.event_code,
             flight_mode=s.flight_mode.value,
             crew_position=fl.crew_position.value,
+            crew_qual_code=fl.crew_qual_code,
             departure_location=s.departure_location,
             arrival_location=s.arrival_location,
             total_hours=fl.total_hours or fl.hours_logged,

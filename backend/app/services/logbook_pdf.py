@@ -70,6 +70,7 @@ def _entry_dict(fl: FlightLog) -> dict:
         "tms": ac.type_model_series if ac else "",
         "buno": ac.bureau_number if ac else "",
         "code": s.event_code or "",
+        "qual": fl.crew_qual_code or "",
         "total_hours": fl.total_hours or fl.hours_logged or 0.0,
         "first_pilot_hours": fl.first_pilot_hours or 0.0,
         "copilot_hours": fl.copilot_hours or 0.0,

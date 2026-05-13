@@ -56,6 +56,7 @@ class FlightLogOut(BaseModel):
     nvg_tactical_ll_hours: float = 0.0
     syllabus_event_completed: Optional[str] = None
     instructor_remarks: Optional[str] = None
+    crew_qual_code: Optional[str] = None
     special_crew_time_hours: Optional[float] = None
     data_provenance: DataProvenance = DataProvenance.ENTERED
     instrument_approaches: List[InstrumentApproachRead] = []

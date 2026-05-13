@@ -276,6 +276,7 @@ class LogbookEntry(BaseModel):
     event_code: Optional[str] = None
     flight_mode: str
     crew_position: str
+    crew_qual_code: Optional[str] = None
     departure_location: Optional[str] = None
     arrival_location: Optional[str] = None
     # Hours

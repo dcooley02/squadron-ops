@@ -249,7 +249,7 @@
         <td class="tl">{{ entry.date }}</td>
         <td>{{ entry.tms }}</td>
         <td>{{ entry.buno }}</td>
-        <td>{{ entry.code }}</td>
+        <td>{{ entry.code }}{% if entry.qual %} · {{ entry.qual }}{% endif %}</td>
         <td class="tr">{{ entry.total_hours | fmt_num }}</td>
         <td class="tr">{{ entry.first_pilot_hours | fmt_num }}</td>
         <td class="tr">{{ entry.copilot_hours | fmt_num }}</td>

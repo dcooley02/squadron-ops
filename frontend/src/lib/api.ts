@@ -135,6 +135,7 @@ export interface FlightLogOut {
   syllabus_event_completed: string | null;
   // Optional richer fields returned by /api/sorties/{id}; not always present on other endpoints
   instructor_remarks?: string | null;
+  crew_qual_code?: string | null;
   data_provenance?: "BACKFILLED" | "ENTERED" | null;
   total_hours?: number | null;
   first_pilot_hours?: number | null;
@@ -649,6 +650,31 @@ export const fetchPersonTrainingJacket = async (personId: number): Promise<Train
   const { data } = await api.get<TrainingJacketEntry[]>(
     `/api/logging/persons/${personId}/training-jacket`
   );
+  return data;
+};
+
+export type SafetyReportSeverity = "INFO" | "HAZARD" | "INCIDENT" | "MISHAP";
+export type SafetyReportStatus = "OPEN" | "UNDER_REVIEW" | "CLOSED";
+
+export interface SafetyReport {
+  id: number;
+  sortie_id: number | null;
+  reported_by_person_id: number | null;
+  severity: SafetyReportSeverity;
+  category: string | null;
+  description: string;
+  actions_taken: string | null;
+  status: SafetyReportStatus;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export const fetchSafetyReportsForSortie = async (
+  sortieId: number
+): Promise<SafetyReport[]> => {
+  const { data } = await api.get<SafetyReport[]>("/api/logging/safety/reports", {
+    params: { sortie_id: sortieId },
+  });
   return data;
 };
 

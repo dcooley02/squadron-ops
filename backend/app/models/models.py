@@ -417,6 +417,8 @@ class FlightLog(Base):
     # New in flight-logging
     instructor_remarks = Column(Text, nullable=True)
     readiness_credits_count = Column(Integer, default=0, nullable=False)
+    # CNAF M-3710.7 single-letter qualification code, attached per-flight
+    crew_qual_code = Column(String(1), nullable=True)
 
     # Per-crewmember hour categories
     night_hours              = Column(Float, default=0.0, nullable=False)

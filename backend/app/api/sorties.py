@@ -75,6 +75,7 @@ def _log_out(fl: FlightLog) -> FlightLogOut:
         "nvg_tactical_ll_hours": fl.nvg_tactical_ll_hours or 0.0,
         "syllabus_event_completed": fl.syllabus_event_completed,
         "instructor_remarks": fl.instructor_remarks,
+        "crew_qual_code": fl.crew_qual_code,
         "special_crew_time_hours": fl.special_crew_time_hours,
         "data_provenance": fl.data_provenance,
         "instrument_approaches": [_approach_out(a) for a in fl.instrument_approaches],
