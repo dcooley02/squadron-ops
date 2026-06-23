@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { downloadPdf } from "./pdf";
 import type {
   LogbookFilters,
   LogbookResponse,
@@ -34,28 +35,12 @@ export async function fetchSortieDetail(sortieId: number): Promise<SortieDetailF
 
 // ── PDF downloads ────────────────────────────────────────────────────────────
 
-async function triggerPdfDownload(
-  url: string,
-  filename: string,
-  params: Record<string, string | number> = {}
-): Promise<void> {
-  const response = await api.get(url, { responseType: "blob", params });
-  const blobUrl = URL.createObjectURL(response.data as Blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
-}
-
 export async function downloadLogbookPdf(
   personId: number,
   lastName: string,
   firstInitial: string
 ): Promise<void> {
-  await triggerPdfDownload(
+  await downloadPdf(
     `/api/logging/logbook/${personId}/pdf`,
     `logbook_${lastName}_${firstInitial}.pdf`
   );
@@ -74,7 +59,7 @@ export async function downloadLogbookPdfFiltered(
   if (filters.event_code) params.event_code = filters.event_code;
   if (filters.crew_position) params.crew_position = filters.crew_position;
   if (filters.flight_mode) params.flight_mode = filters.flight_mode;
-  await triggerPdfDownload(
+  await downloadPdf(
     `/api/logging/logbook/${personId}/pdf/filtered`,
     `logbook_${lastName}_${firstInitial}_filtered.pdf`,
     params

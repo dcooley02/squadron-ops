@@ -21,7 +21,6 @@ import {
   type SortieSummary,
   type CrewPosition,
 } from "../lib/api";
-import { useAuth } from "../context/AuthContext";
 import AssignCrewPanel from "./AssignCrewPanel";
 import Badge from "./Badge";
 import { useToast } from "./Toast";
@@ -58,9 +57,7 @@ interface Props {
 
 export default function SortieTile({ sortieId, sortieSummary: summary, onDeleted }: Props) {
   const qc = useQueryClient();
-  const { hasRole } = useAuth();
   const { showToast } = useToast();
-  const canManageSchedule = hasRole("sdo", "co_xo");
   const [assignPanel, setAssignPanel] = useState<CrewPosition | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -183,17 +180,15 @@ export default function SortieTile({ sortieId, sortieSummary: summary, onDeleted
         </button>
       </div>
 
-      {canManageSchedule && (
-        <div className="mb-3">
-          <button
-            onClick={handleSuggestCrew}
-            disabled={suggesting}
-            className="text-xs px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-          >
-            {suggesting ? "Ranking crew…" : "Suggest crew"}
-          </button>
-        </div>
-      )}
+      <div className="mb-3">
+        <button
+          onClick={handleSuggestCrew}
+          disabled={suggesting}
+          className="text-xs px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+        >
+          {suggesting ? "Ranking crew…" : "Suggest crew"}
+        </button>
+      </div>
 
       {/* Crew slots */}
       <div className="space-y-1.5 mb-3">

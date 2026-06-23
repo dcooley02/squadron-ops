@@ -2,14 +2,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
-import { FileDown } from "lucide-react";
-import {
-  downloadReadinessBriefPdf,
-  fetchSquadronReadiness,
-  type AnchorTaskStatus,
-  type CapabilityArea,
-  type SquadronReadiness,
-} from "../lib/api";
+import { downloadReadinessBriefPdf, fetchSquadronReadiness, type AnchorTaskStatus, type CapabilityArea, type SquadronReadiness } from "../lib/api";
+import PdfExportButton from "../components/PdfExportButton";
 import Loading from "../components/Loading";
 import TRatingBadge from "../components/TRatingBadge";
 import { formatDate } from "../lib/dates";
@@ -30,25 +24,10 @@ function anchorStatusClass(status: string): string {
 
 export default function Readiness() {
   const [selectedArea, setSelectedArea] = useState<CapabilityArea | null>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-
   const { data, isLoading, error } = useQuery({
     queryKey: ["squadron-readiness"],
     queryFn: fetchSquadronReadiness,
   });
-
-  const handleExportPdf = async () => {
-    setPdfError(null);
-    setPdfLoading(true);
-    try {
-      await downloadReadinessBriefPdf();
-    } catch {
-      setPdfError("PDF export failed. WeasyPrint may not be installed on the server (HTTP 503).");
-    } finally {
-      setPdfLoading(false);
-    }
-  };
 
   if (isLoading) return <Loading message="Computing WTM readiness..." />;
   if (error || !data) {
@@ -84,16 +63,11 @@ export default function Readiness() {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={pdfLoading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-50"
-          >
-            <FileDown size={14} />
-            {pdfLoading ? "Exporting…" : "Export PDF"}
-          </button>
-          {pdfError && <p className="text-xs text-red-400 max-w-xs text-right">{pdfError}</p>}
+          <PdfExportButton
+            label="Export PDF"
+            onDownload={downloadReadinessBriefPdf}
+            className="items-end"
+          />
         </div>
       </div>
 

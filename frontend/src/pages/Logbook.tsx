@@ -15,6 +15,7 @@ import {
   downloadLogbookPdf,
   downloadLogbookPdfFiltered,
 } from "../lib/logbook";
+import { pdfErrorMessage } from "../lib/pdf";
 import Loading from "../components/Loading";
 import LogbookEntryDetail from "../components/LogbookEntryDetail";
 import type { LogbookEntry, LogbookFilters, LogbookTotals } from "../types/logbook";
@@ -171,8 +172,8 @@ export default function Logbook() {
     setPdfError(null);
     try {
       await downloadLogbookPdf(personId, lastName, firstInitial);
-    } catch {
-      setPdfError("PDF download failed. WeasyPrint may not be installed on the server (HTTP 503).");
+    } catch (err) {
+      setPdfError(pdfErrorMessage(err));
     } finally {
       setDownloading(false);
     }
@@ -184,8 +185,8 @@ export default function Logbook() {
     setPdfError(null);
     try {
       await downloadLogbookPdfFiltered(personId, filters, lastName, firstInitial);
-    } catch {
-      setPdfError("PDF download failed. WeasyPrint may not be installed on the server (HTTP 503).");
+    } catch (err) {
+      setPdfError(pdfErrorMessage(err));
     } finally {
       setDownloading(false);
     }

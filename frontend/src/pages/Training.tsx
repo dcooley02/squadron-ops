@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
@@ -144,27 +144,46 @@ const TRACK_COLORS: Record<string, string> = {
   AIRCREW_AMCM: "bg-purple-950/50 text-purple-400 border border-purple-800/50",
 };
 
+type TrackFilter = "all" | "PILOT" | "AIRCREW";
+
 function EventsTab() {
-  const [track, setTrack] = useState<string>("all");
+  const [track, setTrack] = useState<TrackFilter>("all");
   const [stanEvalOnly, setStanEvalOnly] = useState(false);
 
-  const { data: events, isLoading } = useQuery({
-    queryKey: ["syllabus-events", track, stanEvalOnly],
+  const { data: allEvents, isLoading, error } = useQuery({
+    queryKey: ["syllabus-events", stanEvalOnly],
     queryFn: () =>
       fetchSyllabusEvents({
-        track: track === "all" ? undefined : track,
         is_stan_eval: stanEvalOnly || undefined,
       }),
   });
 
+  const events = useMemo(() => {
+    if (!allEvents) return [];
+    if (track === "PILOT") {
+      return allEvents.filter((e) => e.track?.startsWith("PILOT"));
+    }
+    if (track === "AIRCREW") {
+      return allEvents.filter((e) => e.track?.startsWith("AIRCREW"));
+    }
+    return allEvents;
+  }, [allEvents, track]);
+
   if (isLoading) return <Loading />;
+  if (error) {
+    return (
+      <div className="card border-red-600/50 bg-red-950/20 text-red-300">
+        Failed to load syllabus events. Is the backend running?
+      </div>
+    );
+  }
 
   return (
     <div className="card">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="flex gap-1">
-          {["all", "PILOT", "AIRCREW"].map((t) => (
+          {(["all", "PILOT", "AIRCREW"] as TrackFilter[]).map((t) => (
             <button
               key={t}
               onClick={() => setTrack(t)}
@@ -204,9 +223,15 @@ function EventsTab() {
             </tr>
           </thead>
           <tbody>
-            {(events ?? []).map((ev) => (
-              <EventRow key={ev.id} event={ev} />
-            ))}
+            {events.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-sm text-slate-500">
+                  No events match this filter.
+                </td>
+              </tr>
+            ) : (
+              events.map((ev) => <EventRow key={ev.id} event={ev} />)
+            )}
           </tbody>
         </table>
       </div>

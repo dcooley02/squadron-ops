@@ -24,7 +24,7 @@ export default function BoardLayout({ boardName, lastUpdatedAt, children }: Prop
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-950 flex flex-col">
+    <div className="fixed inset-0 h-dvh max-h-dvh bg-slate-950 flex flex-col overflow-hidden">
       {/* Top bar */}
       <div className="h-[60px] shrink-0 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6">
         <div className="flex items-baseline gap-3">

@@ -89,6 +89,7 @@ def build_day_ops(db: Session, day: date) -> dict:
         "watchbill": [
             {
                 "id": w.id,
+                "duty_date": w.duty_date,
                 "role": w.role.value,
                 "person_id": w.person_id,
                 "person_name": f"{w.person.last_name}, {w.person.first_name}",

@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import {
   fetchSortie,
   fetchSafetyReportsForSortie,
-  briefSheetPdfUrl,
+  downloadBriefSheetPdf,
   type CrewPosition,
   type SortieDetail as SortieDetailType,
   type FlightLogOut,
@@ -14,6 +14,7 @@ import {
   type SafetyReportStatus,
 } from "../lib/api";
 import Loading from "../components/Loading";
+import PdfExportButton from "../components/PdfExportButton";
 import Badge from "../components/Badge";
 
 const POSITION_BADGE_VARIANT: Record<CrewPosition, "info" | "warning" | "neutral"> = {
@@ -120,12 +121,10 @@ export default function SortieDetail() {
             {data.ops_status && (
               <Badge variant="neutral">{data.ops_status}</Badge>
             )}
-            <a
-              href={briefSheetPdfUrl(sortieId)}
-              className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-400"
-            >
-              Brief sheet PDF
-            </a>
+            <PdfExportButton
+              label="Brief sheet PDF"
+              onDownload={() => downloadBriefSheetPdf(sortieId)}
+            />
             <Badge variant={data.is_complete ? "success" : "info"}>
               {data.is_complete ? "Complete" : "Scheduled"}
             </Badge>

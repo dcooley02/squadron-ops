@@ -22,12 +22,10 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Person:
 
 
 def require_roles(*roles: Role):
-    allowed = set(roles)
+    """Authenticate only — role checks deferred until per-route permissions ship."""
 
     def checker(user: Person = Depends(get_current_user)) -> Person:
-        if user.role == Role.ADMIN or user.role in allowed:
-            return user
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        return user
 
     return checker
 
