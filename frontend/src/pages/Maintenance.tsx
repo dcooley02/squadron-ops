@@ -1,6 +1,6 @@
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle } from "lucide-react";
 import { fetchAircraft, fetchAircraftDetail, type AircraftDetail, type AircraftStatus } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
@@ -55,8 +55,21 @@ export default function Maintenance() {
         <StatCard label="NMC" value={nmcCount} variant="danger" />
       </div>
 
-      {/* B — Status drift alert */}
-      {driftingAircraft.length > 0 && (
+      {/* B — All clear or drift alert */}
+      {driftingAircraft.length === 0 && nmcCount === 0 ? (
+        <div className="card border-green-800/30 bg-green-950/15 py-4">
+          <div className="flex items-center gap-3 text-green-300">
+            <CheckCircle size={20} className="text-green-400 shrink-0" />
+            <div>
+              <div className="text-sm font-medium">No pending line status updates</div>
+              <div className="text-xs text-green-400/70 mt-0.5">
+                All {fmcCount + pmcCount} flyable aircraft have stamped status matching computed
+                readiness. QA release available when maintenance changes computed status.
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : driftingAircraft.length > 0 ? (
         <div className="card border-yellow-700/40 bg-yellow-950/20 space-y-2">
           <div className="flex items-center gap-2 text-yellow-400 font-medium text-sm">
             <AlertTriangle size={16} />
@@ -91,7 +104,7 @@ export default function Maintenance() {
             })}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* C — Aircraft grid */}
       <div>

@@ -21,9 +21,9 @@ const BOARDS = [
   {
     to: "/board/readiness",
     icon: <Shield size={36} className="text-green-400" />,
-    title: "Readiness Board",
+    title: "Squadron Snapshot",
     description:
-      "FMC rate ring, personnel composition, 30-day activity, currency overview, and aircraft strip.",
+      "FMC rate ring, personnel, 30-day activity, currency overview, and aircraft strip. Not WTM T-ratings.",
     accent: "hover:border-green-700/60",
   },
 ];

@@ -1,0 +1,105 @@
+================================================================================
+SQUADRON OPS v2 — 10-MINUTE DEMO SCRIPT
+================================================================================
+Audience: SDO, maintainer, or senior aviator
+Prerequisite: reseed (python seed.py), servers running on :5174 / :8001
+
+--------------------------------------------------------------------------------
+MINUTE 0–1 | DASHBOARD — SITUATIONAL AWARENESS
+--------------------------------------------------------------------------------
+Open: http://localhost:5174/
+
+Talking points:
+  - "Morning brief" view: personnel, aircraft readiness, currency warnings
+  - Computed vs stamped: computed reflects open discrepancies and inspections;
+    stamped is what the line has released safe for flight
+  - Next 24 Hours: today's scheduled sorties
+
+Click: Maintenance link if drift banner visible (expect 3 aircraft after reseed)
+
+--------------------------------------------------------------------------------
+MINUTE 1–3 | MAINTENANCE — STAMPED VS COMPUTED
+--------------------------------------------------------------------------------
+Open: /maintenance
+
+Talking points:
+  - Stat strip uses computed FMC/PMC/NMC (not stamped)
+  - Yellow banner: aircraft awaiting QA release
+  - 614: stamped FMC, computed PMC — flyable with degraded capability
+  - 615: DOWNING in work — not safe for flight until resolved
+  - 617: DOWNING awaiting parts (AWP) — computed NMCS
+
+If all green (no drift): reseed before demo.
+
+Click: 614 → aircraft maintenance detail
+
+--------------------------------------------------------------------------------
+MINUTE 3–5 | QA RELEASE — CLOSE THE MAINTAINER LOOP
+--------------------------------------------------------------------------------
+Open: /maintenance/{614-id}
+
+Talking points:
+  - Inspections with overdue/downing flags
+  - Open discrepancies with MAF numbers and work status
+  - QA Release card: after QA signoff, stamp line status to computed
+
+Action (614):
+  1. Open QA Release
+  2. Enter QA notes: "QA inspection complete; FLIR degraded ops authorized IAW NATOPS"
+  3. Release for Flight
+  4. Toast confirms status sync; stamped now PMC
+
+Optional (615 or 617): show release blocked — not safe for flight
+
+Return: Dashboard — drift count decreased
+
+--------------------------------------------------------------------------------
+MINUTE 5–8 | SORTIE COMPLETION — CASCADE
+--------------------------------------------------------------------------------
+Open: /sorties → pick incomplete sortie (prefer ASU/NVG P211 on day+2)
+
+Talking points:
+  - Schedule assigned crew; Complete Sortie logs actuals
+  - Per-crew night/NVG/instrument hours; Apply mission profile to all crew
+  - Validation prevents incomplete times or missing crew hours
+
+Action:
+  1. Complete Sortie
+  2. Confirm takeoff/landing times, crew hours
+  3. Submit
+
+Open: /crew/{HAC-id} — show NIGHT_NVD (or applicable) currency renewed
+
+Talking points:
+  - Sortie completion cascades to currencies, aircraft hours, training jacket
+  - One system, not three spreadsheets
+
+Optional: complete SIM_TOFT P200 sortie — note sim-ineligible currencies skip
+
+--------------------------------------------------------------------------------
+MINUTE 8–10 | TRAINING + BOARDS (OPTIONAL CLOSE)
+--------------------------------------------------------------------------------
+Open: /training — syllabus and gradecards
+
+Open: /board → Squadron Snapshot (TV mode)
+  - Clarify: operational snapshot, not WTM T-ratings yet
+
+Open: /admin → Audit tab
+  - QA release and sortie completion logged
+
+Closing line:
+  "This is the spine — fly, log, readiness updates, maintenance reconciles.
+   WTM T-ratings and full 4790 chain are on the roadmap."
+
+--------------------------------------------------------------------------------
+GOLDEN PATH CHECKLIST (verify before high-stakes demo)
+--------------------------------------------------------------------------------
+[ ] Reseed completed
+[ ] Dashboard shows Next 24 Hours sorties
+[ ] Maintenance shows 3 drift aircraft (614, 615, 617)
+[ ] QA release on 614 succeeds with toast
+[ ] QA release on 615 blocked
+[ ] Complete one sortie → crew currency date advances
+[ ] npm run build passes
+
+================================================================================

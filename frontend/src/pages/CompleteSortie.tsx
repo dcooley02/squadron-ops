@@ -299,6 +299,7 @@ export default function CompleteSortie() {
   // ── Mutation ──────────────────────────────────────────────────────────────
   const mutation = useMutation({
     mutationFn: () => {
+      if (!sortie) throw new Error("Sortie not loaded");
       const activityFields = Object.fromEntries(
         Object.entries(activity)
           .filter(([, v]) => v !== "")
@@ -386,7 +387,7 @@ export default function CompleteSortie() {
   }
 
   // ── Sortie-dependent derived values ───────────────────────────────────────
-  const canSubmit = timesValid && crewValid && !mutation.isPending;
+  const canSubmit = timesValid && crewValid && !hourMismatch && !mutation.isPending;
   const crew = sortie.flight_logs;
   const activeTaskOpts = (taskOptions ?? []).filter((o) => o.is_active);
 
@@ -1001,11 +1002,22 @@ export default function CompleteSortie() {
             Cancel
           </Link>
           <div className="flex items-center gap-3">
-            {!timesValid && (
-              <span className="text-xs text-slate-500">Fix times to continue</span>
+            {!takeoff && (
+              <span className="text-xs text-yellow-400">Takeoff time required</span>
+            )}
+            {takeoff && !land && (
+              <span className="text-xs text-yellow-400">Landing time required</span>
+            )}
+            {takeoff && land && takeoff >= land && (
+              <span className="text-xs text-yellow-400">Landing must be after takeoff</span>
             )}
             {timesValid && !crewValid && (
-              <span className="text-xs text-slate-500">Enter crew hours to continue</span>
+              <span className="text-xs text-yellow-400">Enter hours for all crew positions</span>
+            )}
+            {timesValid && crewValid && hourMismatch && (
+              <span className="text-xs text-yellow-400">
+                Activity hours ({sumH.toFixed(1)}) must match duration ({dur.toFixed(1)})
+              </span>
             )}
             <button
               type="button"

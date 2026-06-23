@@ -1,0 +1,59 @@
+================================================================================
+SQUADRON OPS v2 — DEMO CHEATSHEET
+================================================================================
+
+START SERVERS
+  docker compose up -d
+  cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8001
+  cd frontend && npm run dev
+
+URLS
+  App:        http://localhost:5174
+  API:        http://localhost:8001
+  API docs:   http://localhost:8001/docs
+
+BEFORE EVERY DEMO
+  cd backend && python seed.py
+  (Restores drift scenarios, today's sorties, and currency distribution)
+
+KEY AIRCRAFT (use SIDE NUMBERS — DB ids change each reseed)
+  610–613  True FMC (stamped = computed)
+  614      Drift: stamped FMC → computed PMC (open MAJOR) — QA release OK
+  615      Drift: stamped FMC → computed NMCM (DOWNING in work) — release blocked
+  616      Stamped PMC
+  617      Drift: stamped FMC → computed NMCS (DOWNING AWP) — release blocked
+
+  Resolve DB id from side number: /maintenance (click aircraft card)
+
+TODAY'S SORTIES (Dashboard → Next 24 Hours)
+  0900  Proficiency (day)
+  1400  P201 intro
+  Find NVG sortie on Schedule for cascade demo (day+2 evening ASU P211)
+
+SIM SORTIE
+  Schedule → day+3 1500 P200 TOFT sim (flight_mode SIM_TOFT)
+  Complete to show sim-eligible-only currency renewal
+
+TERMINOLOGY (use these words)
+  QA release / release for flight / safe for flight
+  Stamped vs computed line status
+  Do NOT say "RTS" (Ready to Strike)
+
+QUICK PATHS
+  Dashboard:           /
+  Maintenance drift:   /maintenance
+  Aircraft 614 QA:     /maintenance/{id}
+  Sorties:             /sorties
+  Complete sortie:     /sorties/{id}/complete
+  Crew currency:       /crew/{id}
+  TV boards:           /board
+
+TROUBLESHOOTING
+  Blank data → reseed
+  No drift banner → reseed (QA release consumes drift)
+  Frontend errors → npm ci in frontend/
+  DB connection → docker compose ps (port 5433)
+
+TAG
+  Demo baseline: v2.0-demo-rc1
+================================================================================
