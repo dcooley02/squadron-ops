@@ -1,3 +1,5 @@
+# Squadron Ops — local PostgreSQL for development and demonstration.
+# Application (API + frontend) runs on the host; only the database is containerized.
 services:
   db:
     image: postgres:16

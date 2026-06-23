@@ -1,11 +1,11 @@
 ================================================================================
-SQUADRON OPS v2 — BROWSER PLUGIN COMPREHENSIVE DEMO REVIEW
+SQUADRON OPS — BROWSER PLUGIN COMPREHENSIVE DEMO REVIEW
 ================================================================================
 Copy everything below the line into your browser agent / plugin.
 
 --------------------------------------------------------------------------------
 
-You are performing a **comprehensive, hands-on review** of Squadron Ops v2 — a
+You are performing a **comprehensive, hands-on review** of Squadron Ops — a
 naval aviation operations web demo (HSC / MH-60S). Your job is to determine
 whether this build is **credible and demo-ready** for a mixed audience of SDOs,
 maintainers, senior aviators, and program managers.
@@ -20,7 +20,7 @@ do not infer behavior from static HTML alone.
 | App URL | http://localhost:5174 |
 | Login | http://localhost:5174/login |
 | API | http://localhost:8001 |
-| Demo baseline | v2.0-demo-rc8 |
+| Build |
 | Password (all users) | `demo1234` |
 
 ### Preflight
@@ -263,11 +263,11 @@ Run in order. Mark each **PASS / FAIL / SKIP** with one-line evidence.
 ## Output format (use exactly this structure)
 
 ```markdown
-# Squadron Ops v2 — Browser Review Report
+# Squadron Ops — Browser Review Report
 
 **Date:**
 **Plugin / agent:**
-**Baseline:** v2.0-demo-rc8
+**Baseline:** local demonstration build
 **Environment reachable:** Yes / No
 **Reseed recommended:** Yes / No
 **Demo-ready verdict:** Yes / No / With fixes
