@@ -39,6 +39,7 @@ from app.models.models import (
     SortieLeg, InstrumentApproach, SortieTmrCode, TmrCode, AuditLog,
     BoardSchedule, BoardType, BoardStatus, WatchbillEntry, WatchbillRole,
     SchedulePublication, SortieOpsStatus,
+    QaSignoff, PartsRequest, AircraftLogbookEntry, WorkOrder, Maf, WorkCenter,
     Role, CrewPosition, AircraftStatus, DiscrepancySeverity, DiscrepancyWorkStatus,
     FlightMode, CapabilityArea, CapabilityAreaConfig, TaskGrade, CrewScope,
     SyllabusLevel, SyllabusStage, SyllabusTrack, EventVenue,
@@ -638,6 +639,12 @@ def wipe(db):
     db.query(SortieTaskCredit).delete()
     db.query(InstrumentApproach).delete()
     db.query(SortieTmrCode).delete()
+    db.query(QaSignoff).delete()
+    db.query(PartsRequest).delete()
+    db.query(AircraftLogbookEntry).delete()
+    db.query(WorkOrder).delete()
+    db.query(Maf).delete()
+    db.query(WorkCenter).delete()
     db.query(Discrepancy).delete()
     db.query(SafetyReport).delete()
     db.query(FlightLog).delete()
@@ -655,6 +662,7 @@ def wipe(db):
     db.query(Aircraft).delete()
     db.query(Person).delete()
     db.query(CbrTaskOption).delete()
+    db.query(CapabilityAreaConfig).delete()
     db.commit()
 
 
