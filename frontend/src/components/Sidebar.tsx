@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "../context/AuthContext";
-import { NAV_ITEMS } from "../lib/permissions";
+import { canSeeNav, NAV_ITEMS } from "../lib/permissions";
 
 const ICONS: Record<string, typeof LayoutDashboard> = {
   Dashboard: LayoutDashboard,
@@ -23,7 +23,7 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
-  const visible = user ? NAV_ITEMS : [];
+  const visible = user ? NAV_ITEMS.filter((item) => canSeeNav(user.role, item)) : [];
 
   return (
     <aside className="w-56 bg-slate-900 border-r border-slate-800 flex flex-col">

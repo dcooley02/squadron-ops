@@ -21,7 +21,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Person:
     return person
 
 
-def require_roles(*roles: Role):
+def require_roles(*_roles: Role):
     """Authenticate only — role checks deferred until per-route permissions ship."""
 
     def checker(user: Person = Depends(get_current_user)) -> Person:

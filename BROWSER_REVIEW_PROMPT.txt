@@ -20,7 +20,7 @@ do not infer behavior from static HTML alone.
 | App URL | http://localhost:5174 |
 | Login | http://localhost:5174/login |
 | API | http://localhost:8001 |
-| Demo baseline | v2.0-demo-rc7 |
+| Demo baseline | v2.0-demo-rc8 |
 | Password (all users) | `demo1234` |
 
 ### Preflight
@@ -169,8 +169,8 @@ Check:
 - Schedule publish control works (or shows meaningful error if already published)
 - Watchbill entries visible
 - Sortie ops status can be advanced
-- **Export ATO PDF** — note if link fails (direct href may omit JWT; blob
-  download preferred). Record behavior, don't auto-fail unless page breaks.
+- **Export ATO PDF** — PdfExportButton with JWT blob download; 503 if WeasyPrint
+  missing. Record behavior, don't auto-fail unless page breaks.
 
 ---
 
@@ -256,7 +256,7 @@ Run in order. Mark each **PASS / FAIL / SKIP** with one-line evidence.
 - Assisted scheduling is heuristic ranking, not optimization
 - Password reset not implemented
 - Per-route RBAC not enforced — all pages open to any logged-in user
-- Direct `<a href>` PDF links (ATO, brief sheet) may 401 without JWT
+- PDF exports require WeasyPrint on backend (503 otherwise)
 
 ---
 
@@ -267,7 +267,7 @@ Run in order. Mark each **PASS / FAIL / SKIP** with one-line evidence.
 
 **Date:**
 **Plugin / agent:**
-**Baseline:** v2.0-demo-rc7
+**Baseline:** v2.0-demo-rc8
 **Environment reachable:** Yes / No
 **Reseed recommended:** Yes / No
 **Demo-ready verdict:** Yes / No / With fixes

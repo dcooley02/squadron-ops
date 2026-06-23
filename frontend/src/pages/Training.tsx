@@ -207,7 +207,7 @@ function EventsTab() {
           />
           Stan/Eval only
         </label>
-        <span className="text-xs text-slate-500 ml-auto">{events?.length ?? 0} events</span>
+        <span className="text-xs text-slate-500 ml-auto">{events.length} events</span>
       </div>
 
       {/* Table */}

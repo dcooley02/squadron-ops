@@ -6,7 +6,7 @@ See README.md, ROADMAP.md, and KNOWN_ISSUES.md for scope and status.
 ## Stack
 - Backend: FastAPI + SQLAlchemy 2.0 + PostgreSQL 16 + Alembic, Python 3.12
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui
-- Auth: JWT login + role-filtered sidebar (demo password `demo1234`)
+- Auth: JWT login required; open demo nav for all authenticated users (password `demo1234`)
 - Database runs in Docker (see docker-compose.yml)
 
 ## Project structure

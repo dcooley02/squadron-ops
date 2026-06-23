@@ -1,4 +1,5 @@
 import { useState } from "react";
+import axios from "axios";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
@@ -36,6 +37,27 @@ function nextOpsStatus(current: SortieOpsStatus): SortieOpsStatus | null {
   return OPS_STATUS_ORDER[idx + 1];
 }
 
+function queryErrorDetail(error: unknown): string | null {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) =>
+          typeof item === "object" && item && "msg" in item
+            ? String((item as { msg: string }).msg)
+            : String(item)
+        )
+        .join("; ");
+    }
+    return error.message || null;
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message: string }).message);
+  }
+  return null;
+}
+
 export default function Ops() {
   const today = format(new Date(), "yyyy-MM-dd");
   const [opsDate, setOpsDate] = useState(today);
@@ -65,10 +87,7 @@ export default function Ops() {
 
   if (isLoading) return <Loading message="Loading day-of ops..." />;
   if (error || !data) {
-    const detail =
-      error && typeof error === "object" && "message" in error
-        ? String((error as { message: string }).message)
-        : null;
+    const detail = error ? queryErrorDetail(error) : null;
     return (
       <div className="card border-red-600/50 bg-red-950/20 text-red-300">
         <p>Failed to load ops data.</p>
