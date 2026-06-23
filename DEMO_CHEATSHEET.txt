@@ -1,59 +1,88 @@
 ================================================================================
 SQUADRON OPS v2 — DEMO CHEATSHEET
 ================================================================================
+Baseline: v2.0-demo-rc6 · 36 pytest · 61 CBR task options seeded
 
-START SERVERS
-  docker compose up -d
+ONE-COMMAND PREP
+  ./scripts/demo-prep.sh
+
+START SERVERS (after prep)
   cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8001
   cd frontend && npm run dev
 
 URLS
   App:        http://localhost:5174
+  Login:      http://localhost:5174/login
   API:        http://localhost:8001
   API docs:   http://localhost:8001/docs
 
+LOGIN (password demo1234 for all)
+  anderson.robert   SDO
+  morgan.david      Maint Control
+  mitchell.james    Line Pilot
+  cooper.lisa       Training Officer
+  admin             Admin (audit, full access)
+
 BEFORE EVERY DEMO
-  cd backend && python seed.py
-  (Restores drift scenarios, today's sorties, and currency distribution)
+  ./scripts/demo-prep.sh
+  (Restores drift scenarios, today's sorties, currency distribution, area configs)
 
-KEY AIRCRAFT (use SIDE NUMBERS — DB ids change each reseed)
+KEY AIRCRAFT (SIDE NUMBERS — DB ids change each reseed)
   610–613  True FMC (stamped = computed)
-  614      Drift: stamped FMC → computed PMC (open MAJOR) — QA release OK
-  615      Drift: stamped FMC → computed NMCM (DOWNING in work) — release blocked
+  614      Drift: stamped FMC → computed PMC — QA release OK
+  615      Drift: stamped FMC → computed NMCM (DOWNING) — release blocked
   616      Stamped PMC
-  617      Drift: stamped FMC → computed NMCS (DOWNING AWP) — release blocked
+  617      Drift: stamped FMC → computed NMCS (AWP) — release blocked
 
-  Resolve DB id from side number: /maintenance (click aircraft card)
+  Resolve id: /maintenance → click aircraft card
 
 TODAY'S SORTIES (Dashboard → Next 24 Hours)
   0900  Proficiency (day)
   1400  P201 intro
-  Find NVG sortie on Schedule for cascade demo (day+2 evening ASU P211)
+  Day+2 evening ASU P211 — best cascade demo (NVG/night hours)
 
 SIM SORTIE
-  Schedule → day+3 1500 P200 TOFT sim (flight_mode SIM_TOFT)
+  Schedule → day+3 1500 P200 TOFT sim
   Complete to show sim-eligible-only currency renewal
 
-TERMINOLOGY (use these words)
+TERMINOLOGY
   QA release / release for flight / safe for flight
   Stamped vs computed line status
   Do NOT say "RTS" (Ready to Strike)
+  WTM T-ratings ≠ Table B-2 currency (related but different views)
 
 QUICK PATHS
   Dashboard:           /
+  WTM readiness:       /readiness
   Maintenance drift:   /maintenance
-  Aircraft 614 QA:     /maintenance/{id}
+  Aircraft 614:        /maintenance/{id}
   Sorties:             /sorties
   Complete sortie:     /sorties/{id}/complete
-  Crew currency:       /crew/{id}
-  TV boards:           /board
+  Schedule + assist:   /schedule
+  SDO ops:             /ops
+  Crew jacket:         /crew/{id}
+  Logbook PDF:         /logbook/{personId}
+  TV boards:           /board  →  /board/readiness
+  Audit:               /admin
+
+PDF EXPORTS (need WeasyPrint on backend)
+  Readiness brief:     /readiness → Export PDF
+  ATO:                 /ops → Export ATO PDF
+  Brief sheet:         sortie detail → brief sheet link
+  Gradecard:           gradecard detail → Export PDF
+  Logbook:             logbook page → Download PDF
 
 TROUBLESHOOTING
-  Blank data → reseed
+  401 on API → log in again (token expired or cleared)
+  Blank data → ./scripts/demo-prep.sh
   No drift banner → reseed (QA release consumes drift)
+  PDF 503 → pip install weasyprint in backend venv
   Frontend errors → npm ci in frontend/
   DB connection → docker compose ps (port 5433)
+  Tests → cd backend && pytest
 
-TAG
-  Demo baseline: v2.0-demo-rc1
+VERIFY BUILD
+  cd backend && pytest -q
+  cd frontend && npm run build
+
 ================================================================================

@@ -1,49 +1,93 @@
 ================================================================================
-SQUADRON OPS v2 — 10-MINUTE DEMO SCRIPT
+SQUADRON OPS v2 — 12-MINUTE DEMO SCRIPT
 ================================================================================
-Audience: SDO, maintainer, or senior aviator
-Prerequisite: reseed (python seed.py), servers running on :5174 / :8001
+Audience: SDO, maintainer, senior aviator, or program manager
+Baseline: tag v2.0-demo-rc6
+Prerequisite: ./scripts/demo-prep.sh (or manual reseed), servers on :5174 / :8001
+
+--------------------------------------------------------------------------------
+MINUTE 0 | LOGIN — ROLE-AWARE ACCESS
+--------------------------------------------------------------------------------
+Open: http://localhost:5174/login
+
+Default demo accounts (password for all: demo1234):
+  anderson.robert   SDO — schedule publish, ops console
+  morgan.david      Maint Control — maintenance rollups
+  mitchell.james    Line Pilot — crew jacket, logbook
+  admin             Admin — audit log, full sidebar
+
+Action: Log in as anderson.robert (SDO)
+
+Talking points:
+  - JWT auth with role-filtered navigation (not open API anymore)
+  - Same dataset, different views by role — closer to how a squadron actually runs
 
 --------------------------------------------------------------------------------
 MINUTE 0–1 | DASHBOARD — SITUATIONAL AWARENESS
 --------------------------------------------------------------------------------
-Open: http://localhost:5174/
+Open: /
 
 Talking points:
-  - "Morning brief" view: personnel, aircraft readiness, currency warnings
-  - Computed vs stamped: computed reflects open discrepancies and inspections;
-    stamped is what the line has released safe for flight
+  - Morning brief: personnel, aircraft readiness, currency warnings
+  - Stamped vs computed: stamped is line-released safe for flight; computed
+    reflects open discrepancies and overdue inspections
+  - WTM capability strip links to full readiness view (distinct from B-2 currency)
   - Next 24 Hours: today's scheduled sorties
 
-Click: Maintenance link if drift banner visible (expect 3 aircraft after reseed)
+Click: Maintenance if drift banner visible (expect 3 aircraft after reseed)
 
 --------------------------------------------------------------------------------
-MINUTE 1–3 | MAINTENANCE — STAMPED VS COMPUTED
+MINUTE 1–3 | READINESS — WTM T-RATINGS (SHARP REPLACEMENT MOMENT)
+--------------------------------------------------------------------------------
+Open: /readiness
+
+Talking points:
+  - Squadron T-rating rollup across 8 capability areas (MOB, FSO, ASU, …)
+  - Table-driven rules: anchor tasks + T-1/T-2 recency windows + currency gates
+  - Explainability: click an area → per-pilot contributing factors and anchor status
+  - Aircrew rollup section (same matrix, informational)
+  - Distinct from individual Table B-2 currency on the dashboard
+
+Action:
+  1. Click MOB (or any yellow/red area)
+  2. Expand a pilot row — show anchor task recency (current / stale / absent)
+  3. Optional: Export PDF → handable readiness brief for CO/XO
+
+Caveat (say this if a senior aviator is in the room):
+  - Simplified Appendix D math — hand-check before claiming full WTM parity
+
+--------------------------------------------------------------------------------
+MINUTE 3–5 | MAINTENANCE — STAMPED VS COMPUTED + 4790 CHAIN
 --------------------------------------------------------------------------------
 Open: /maintenance
 
 Talking points:
   - Stat strip uses computed FMC/PMC/NMC (not stamped)
+  - Phase and release forecast cards (when each aircraft hits phase / goes FMC)
   - Yellow banner: aircraft awaiting QA release
-  - 614: stamped FMC, computed PMC — flyable with degraded capability
-  - 615: DOWNING in work — not safe for flight until resolved
-  - 617: DOWNING awaiting parts (AWP) — computed NMCS
 
-If all green (no drift): reseed before demo.
+Drift scenarios (side numbers — DB ids change each reseed):
+  614  stamped FMC → computed PMC (open MAJOR) — QA release OK
+  615  stamped FMC → computed NMCM (DOWNING in work) — release blocked
+  617  stamped FMC → computed NMCS (DOWNING AWP) — release blocked
 
 Click: 614 → aircraft maintenance detail
 
---------------------------------------------------------------------------------
-MINUTE 3–5 | QA RELEASE — CLOSE THE MAINTAINER LOOP
---------------------------------------------------------------------------------
-Open: /maintenance/{614-id}
-
-Talking points:
+Talking points on detail page:
   - Inspections with overdue/downing flags
-  - Open discrepancies with MAF numbers and work status
-  - QA Release card: after QA signoff, stamp line status to computed
+  - Discrepancy → MAF → work order chain (JCN, work center, type WO)
+  - Line entry: new discrepancy from the aircraft page
+  - Aircraft logbook (ASR/MSR-style entries)
+  - Release forecast for this tail
 
-Action (614):
+If all green (no drift): reseed before demo.
+
+--------------------------------------------------------------------------------
+MINUTE 5–6 | QA RELEASE — CLOSE THE MAINTAINER LOOP
+--------------------------------------------------------------------------------
+Still on: /maintenance/{614-id}
+
+Action:
   1. Open QA Release
   2. Enter QA notes: "QA inspection complete; FLIR degraded ops authorized IAW NATOPS"
   3. Release for Flight
@@ -54,7 +98,7 @@ Optional (615 or 617): show release blocked — not safe for flight
 Return: Dashboard — drift count decreased
 
 --------------------------------------------------------------------------------
-MINUTE 5–8 | SORTIE COMPLETION — CASCADE
+MINUTE 6–8 | SORTIE COMPLETION — CASCADE (THE SPINE)
 --------------------------------------------------------------------------------
 Open: /sorties → pick incomplete sortie (prefer ASU/NVG P211 on day+2)
 
@@ -68,38 +112,64 @@ Action:
   2. Confirm takeoff/landing times, crew hours
   3. Submit
 
-Open: /crew/{HAC-id} — show NIGHT_NVD (or applicable) currency renewed
+Open: /crew/{HAC-id} — show NIGHT_NVD currency renewed + WTM readiness card
 
 Talking points:
-  - Sortie completion cascades to currencies, aircraft hours, training jacket
-  - One system, not three spreadsheets
+  - One cascade: sortie → currencies → aircraft hours → training jacket → readiness
+  - Not three spreadsheets and a SHARP export
 
-Optional: complete SIM_TOFT P200 sortie — note sim-ineligible currencies skip
+Optional: complete SIM_TOFT P200 sortie — sim-ineligible currencies skip
 
 --------------------------------------------------------------------------------
-MINUTE 8–10 | TRAINING + BOARDS (OPTIONAL CLOSE)
+MINUTE 8–9 | ASSISTED SCHEDULING (OPTIONAL — OPS AUDIENCE)
 --------------------------------------------------------------------------------
-Open: /training — syllabus and gradecards
+Open: /schedule
 
-Open: /board → Squadron Snapshot (TV mode)
-  - Clarify: operational snapshot, not WTM T-ratings yet
+Action:
+  1. Pick an unmanned future sortie tile → "Suggest crew"
+  2. Show ranked suggestions with fitness warnings (currency, qual conflicts)
+  3. Optional: "Propose Week" — human accepts each proposed sortie (never auto-publish)
 
-Open: /admin → Audit tab
-  - QA release and sortie completion logged
+Talking points:
+  - Assisted, not automatic — transparent ranking a senior aviator can override
+
+--------------------------------------------------------------------------------
+MINUTE 9–10 | SDO OPS + TRAINING (OPTIONAL CLOSE)
+--------------------------------------------------------------------------------
+Open: /ops — daily ops console
+
+Talking points:
+  - Schedule publish, watchbill, sortie ops status
+  - Export ATO PDF / brief sheet PDF
+
+Open: /training — syllabus, boards, gradecard PDF export
+
+--------------------------------------------------------------------------------
+MINUTE 10–12 | TV BOARDS + AUDIT — CREDIBILITY CLOSE
+--------------------------------------------------------------------------------
+Open: /board/readiness (fullscreen TV mode)
+  - Operational snapshot with WTM T-rating strip
+
+Open: /admin → Audit tab (log in as admin if SDO lacks access)
+  - QA release, sortie completion, and publish actions logged with actor
 
 Closing line:
-  "This is the spine — fly, log, readiness updates, maintenance reconciles.
-   WTM T-ratings and full 4790 chain are on the roadmap."
+  "Fly, log, readiness updates, maintenance reconciles — one integrated system.
+   WTM T-ratings, 4790 maintenance chain, assisted scheduling, and SDO tools
+   are all live in this demo. Full Appendix D parity and wing rollups are next."
 
 --------------------------------------------------------------------------------
 GOLDEN PATH CHECKLIST (verify before high-stakes demo)
 --------------------------------------------------------------------------------
-[ ] Reseed completed
+[ ] ./scripts/demo-prep.sh completed (migrate + reseed)
+[ ] Login works (anderson.robert / demo1234)
 [ ] Dashboard shows Next 24 Hours sorties
+[ ] /readiness loads with area drill-down and anchor tasks
 [ ] Maintenance shows 3 drift aircraft (614, 615, 617)
+[ ] Aircraft 614 shows MAF/WO chain and logbook entries
 [ ] QA release on 614 succeeds with toast
 [ ] QA release on 615 blocked
 [ ] Complete one sortie → crew currency date advances
-[ ] npm run build passes
+[ ] pytest passes (36 tests) and npm run build passes
 
 ================================================================================

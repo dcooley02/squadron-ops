@@ -6,27 +6,49 @@ The v1 demo is preserved at https://github.com/dcooley02/hsc-squadron-ops
 order.
 
 ## Active scope
-See ROADMAP.md for capabilities and ordering.
+See ROADMAP.md for long-term commitments. Demo baseline: `v2.0-demo-rc6`.
 
 ## Carried-over technical debt from v1
 - LOW papercuts deferred: crew header filter count, donut tooltip,
   sortie year display, 41 N+1 gradecard fetches on Squadron Snapshot board
 - datetime.utcnow() deprecation warnings in seed.py (3 instances)
 - HSC-specific syllabus and currency catalog (will be replaced by
-  per-community templates in roadmap item 6)
+  per-community templates in a future batch)
 
-## Phase 4/5 notes (June 2026)
-- Training boards and instructor pairing use transparent heuristics, not full
-  SHARP scheduling rules
-- SDO ops status is manual advance (no automatic airborne detection)
+## Demo polish notes (June 2026 — rc6)
+- Demo prep script: `./scripts/demo-prep.sh`
+- Walkthrough: `DEMO_SCRIPT.txt` (12 min), quick ref: `DEMO_CHEATSHEET.txt`
+- PDF exports require WeasyPrint in the backend venv (503 if missing)
+- Direct `<a href>` PDF links (ATO, brief sheet) do not send JWT — use in-app
+  buttons where auth matters (readiness brief, logbook use blob download)
+
+## Auth / RBAC (rc4)
+- JWT login required for `/api/*` (except `/api/auth/login`)
+- Demo password `demo1234` for all seeded users
+- Password reset not implemented
+- Role-filtered sidebar; some routes use `require_roles` on write endpoints
+
+## Readiness (rc6)
+- WTM T-ratings are table-driven (anchor tasks + area config) with simplified
+  Appendix D math — hand-check before claiming full CHSCWPINST 3500.1F parity
+- CBR library seeded at 61 tasks (scaffolding; full Enclosure 2 parity still open)
+- Readiness brief PDF: `GET /api/readiness/squadron/brief.pdf`
+
+## Maintenance (rc5)
+- 4790-inspired MAF/WO chain, logbook, phase/release forecast shipped
+- Full configuration management (TD compliance, serial-tracked equipment) deferred
+
+## Scheduling assist (rc4)
+- Crew ranking and week proposals are transparent heuristics, not optimization
+- Human-in-the-loop only — no auto-publish
+
+## SDO ops (rc3)
+- Ops status is manual advance (no automatic airborne detection)
 - Comms/freq management intentionally out of scope per ROADMAP
 
-## Phase 2/3 notes (June 2026)
-- WTM T-ratings use simplified anchor-task recency rules in
-  `backend/app/services/readiness.py` — not a full CHSCWPINST 3500.1F
-  Appendix D implementation; hand-check before stakeholder claims
-- Readiness PDF export not built yet
-- pytest suite requires Postgres (`TEST_DATABASE_URL`); CI runs on GitHub Actions
+## Testing
+- pytest suite: 36 tests, Postgres required (`TEST_DATABASE_URL`)
+- CI: GitHub Actions (postgres → pytest → npm build)
 
 ## Architecture invariants (don't break these)
 - Three-layer backend: SQLAlchemy models -> Pydantic schemas -> FastAPI routes

@@ -1,7 +1,7 @@
 ================================================================================
 SQUADRON OPS v2 — PROJECT SUMMARY
 ================================================================================
-Last updated: June 2026 (post Phase 4/5 — tag v2.0-demo-rc3)
+Last updated: June 2026 (demo polish — tag v2.0-demo-rc6)
 Repository: squadron-ops (forked from hsc-squadron-ops v1.0-demo)
 Community focus: HSC / MH-60S (single-squadron demo; multi-squadron deferred)
 Demo docs: DEMO_SCRIPT.txt (10-min walkthrough), DEMO_CHEATSHEET.txt (quick ref)
@@ -54,7 +54,8 @@ Infrastructure
   - CORS allows localhost:5173 and :5174
 
 Auth
-  - Planned JWT + RBAC; NOT implemented. Demo runs open (no login).
+  - JWT login + role-filtered sidebar (rc4). Demo password demo1234 for all users.
+  - RBAC on sensitive write routes (publish, watchbill, audit). Password reset TBD.
 
 ================================================================================
 4. ARCHITECTURE
@@ -330,43 +331,56 @@ Flight logging and cascade (Phase B — verified)
   - Instrument approaches per crewmember
   - Per-crew landing counts on flight logs
 
-Maintenance (Phase A + C — demo-ready slice)
+Maintenance (rc5 — 4790-inspired chain)
   - Computed vs stamped aircraft status with drift messaging
-  - Discrepancy tracking (MAF numbers, severity, work status AWP/AWM/IN_WORK,
-    JCN, type WO codes)
+  - Full discrepancy → MAF → work order chain (JCN, work center, type WO)
+  - Line discrepancy entry, work order sync, parts AWP status
+  - Aircraft logbook (ASR/MSR-style entries)
+  - Phase and release forecasting per tail and squadron rollup
   - Inspection tracking with overdue detection and completion recording
-  - QA release workflow: POST qa-release stamps line status after QA signoff;
-    blocked when DOWNING discs remain, downing inspection overdue, or NMC*
+  - QA release workflow: stamps line status after QA signoff; blocked on DOWNING
   - QA release success toast; Maintenance "all clear" card when no drift
-  - Phase interval / hours-to-phase forecast on maintenance pages
 
 Training
   - SWTP syllabus event catalog (realistic HSC codes)
   - Gradecard create, fill, view, PDF export (SHARP-recognizable layout)
   - Syllabus progress per crewmember (NOT_STARTED / IN_PROGRESS / COMPLETE)
   - Training board scheduling (HAC, NATOPS, Stan/Eval) with ranked instructor pairing
-  - CBR task option library (scaffolding — full Appendix D not yet seeded)
+  - CBR task library: 61 seeded tasks with anchor flags (full Enclosure 2 TBD)
 
-Readiness
-  - Per-person qualifications and Wing Table B-2 currencies
-  - Currency type catalog with applicability rules
-  - Dashboard distinguishes WTM capability T-ratings from Table B-2 currency counts
-  - WTM T-1/T-2/T-3 engine: anchor-task recency + optional currency gates per area
+Readiness (rc6)
+  - Table-driven WTM T-1/T-2/T-3: CapabilityAreaConfig + anchor tasks in DB
+  - Per-person qualifications and Wing Table B-2 currencies (distinct views)
   - GET /api/readiness/squadron and /api/readiness/persons/{id}
-  - /readiness page: squadron rollup, area drill-down, pilot matrix
-  - Crew detail: per-area T-ratings with contributing factors (pilots)
+  - Aircrew rollup on squadron response
+  - /readiness page: area drill-down, anchor tasks, aircrew matrix, PDF export
+  - Crew detail: T-ratings + anchor status (pilots and aircrew)
   - Squadron Snapshot TV board: WTM T-rating strip across 8 capability areas
+  - Exportable readiness brief PDF (WeasyPrint)
 
-Governance
-  - HTTP audit middleware logging consequential API actions
+Scheduling assist (rc4)
+  - Suggest crew: ranked slots with fitness warnings per sortie
+  - Propose week: mission-driven sortie proposals, human accepts each
+  - Conflict detection across currency, qualification, and crew-rest rules
+
+SDO ops (rc3–rc4)
+  - Schedule publish, watchbill, sortie ops status
+  - ATO and brief-sheet PDF export
+  - /ops daily console
+
+Governance (rc4)
+  - JWT auth; role-filtered navigation
+  - HTTP audit middleware with actor on consequential API actions
   - Admin page to browse audit log
 
-Demo credibility (Phases A + Phase 0/1)
+Demo credibility
+  - ./scripts/demo-prep.sh — docker + migrate + seed
+  - DEMO_SCRIPT.txt (12-min walkthrough), DEMO_CHEATSHEET.txt
   - Currency seed distribution (~88% current, not wall of red)
   - Three drift scenarios: 614→PMC, 615→NMCM, 617→NMCS
   - Today's sorties on dashboard "Next 24 Hours"
-  - Production build passes (npm run build)
-  - Tagged demo baseline: v2.0-demo-rc1
+  - 36 pytest tests; production build passes (npm run build)
+  - Tagged demo baseline: v2.0-demo-rc6
 
 ================================================================================
 12. SORTIE COMPLETION CASCADE (SPINE OF THE APP)
@@ -411,26 +425,22 @@ card/modal → "Release for Flight" button.
 Current roadmap batch: #1 Logbook (cascade verification largely complete;
 Batch 2 logging entry points partially done).
 
-Not implemented (committed future work per ROADMAP.md):
+Shipped in demo (rc1–rc6):
+  #1 Logbook cascade — verified end-to-end
+  #2 Readiness — table-driven T-ratings, PDF brief, aircrew rollup (simplified math)
+  #3 Maintenance — MAF/WO chain, logbook, phase/release forecast, QA release
+  #4 Training — boards, instructor pairing, gradecard PDF, syllabus progress
+  #5 SDO tools — publish, watchbill, ops console, ATO/brief PDFs
+  #6 Auth — JWT + RBAC (password reset and empty-state pass still open)
+  #7 Assisted scheduling — suggest crew + propose week
 
-  #2 Readiness Reports — Simplified WTM math shipped (Phase 3); still needed:
-      full Appendix D task library, exportable readiness brief PDF, hand-check
-      verification against known crew jackets
-
-  #3 Maintenance deep-dive — Full CNAF M-4790.2 chain (complete MAF/WO model,
-      work center routing, BCM, ASR/MSR logbook, release projections)
-
-  #4 Training — Simplified boards + instructor pairing + gradecard PDF shipped;
-      full SHARP parity and board automation still open
-
-  #5 SDO tools — Publish schedule, watchbill, day-of ops, ATO/brief PDFs shipped;
-      freq management and multi-day ATO workflow still open
-
-  #6 Auth and polish — JWT, RBAC by role, password reset, empty-state pass
-
-  #7 Auto-schedule — Assisted (not automatic) crew ranking / week builder
-
-  #8 Multi-squadron — Deferred pending stakeholder conversation
+Still open (per ROADMAP.md):
+  - Full Appendix D Enclosure 2 task parity and hand-verified WTM math
+  - Full 4790 configuration management (TD compliance, serial equipment)
+  - Full SHARP board automation parity
+  - SDO freq/comms management; multi-day ATO workflow
+  - Password reset; polish pass on empty/error states
+  - Multi-squadron — deferred pending stakeholder conversation
 
 Non-goals for v2: classified data, mobile-first, real-time co-editing, Navy
 system integration.
@@ -441,15 +451,15 @@ system integration.
 
 From KNOWN_ISSUES.md and development notes:
 
-  - No authentication or authorization
-  - pytest smoke suite (aircraft status, QA release, cascade, readiness); CI on push
+  - Password reset not implemented
+  - pytest suite: 36 tests; CI on push (postgres → pytest → npm build)
   - HSC-specific syllabus/currency catalog (community templates later)
   - datetime.utcnow() deprecation warnings in seed.py
   - Readiness Board: 41 N+1 gradecard fetches (performance)
-  - Frontend production build fixed as of v2.0-demo-rc1 (npm run build passes)
-  - WTM math is simplified (anchor tasks + currency gates), not full Appendix D
-  - Readiness PDF export not implemented
+  - WTM math is simplified (table-driven but not full Appendix D parity)
+  - PDF exports need WeasyPrint locally (503 otherwise)
   - Full 4790 configuration management deferred
+  - Direct href PDF links (ATO) omit JWT — logbook/readiness use blob download
 
 ================================================================================
 16. HOW TO RUN LOCALLY
@@ -463,7 +473,8 @@ From KNOWN_ISSUES.md and development notes:
   Backend:  http://localhost:8001
   API docs: http://localhost:8001/docs
 
-  Reseed database:  cd backend && python seed.py
+  Demo prep:        ./scripts/demo-prep.sh
+  Reseed only:      cd backend && python seed.py
 
   v1 demo (separate repo): http://localhost:5173 on ports 5173/8000
 
@@ -471,8 +482,8 @@ From KNOWN_ISSUES.md and development notes:
 17. DOMAIN QUICK REFERENCE
 ================================================================================
 
-Roles (planned RBAC): PILOT, AIRCREW, SDO, TRAINING_OFFICER, MAINT_CONTROL,
-                      CO_XO, ADMIN
+Roles (RBAC): PILOT, AIRCREW, SDO, TRAINING_OFFICER, MAINT_CONTROL,
+              CO_XO, ADMIN
 
 Crew positions (MH-60S): HAC, H2P, H2P_U, CREW_CHIEF, AIRCREW, AWS
 
@@ -490,36 +501,24 @@ Legacy currency codes (avoid in new logic): NVG, NIGHT_DL — use NIGHT_NVD from
 18. DEMO READINESS ASSESSMENT (JUNE 2026)
 ================================================================================
 
-Status: demo-ready at tag v2.0-demo-rc3 (Phase 4/5 complete).
+Status: demo-ready at tag v2.0-demo-rc6 (three-item plan complete).
 
-External browser review rated the platform credible for a 10-minute walkthrough.
-Core cascade (sortie completion → currency → maintenance status) works without
-critical errors.
+12-minute walkthrough in DEMO_SCRIPT.txt covers login, WTM readiness, 4790
+maintenance chain, sortie cascade, assisted scheduling, and audit close.
 
 Before every stakeholder demo:
-  - Reseed: cd backend && python seed.py
-  - Follow DEMO_SCRIPT.txt; keep DEMO_CHEATSHEET.txt handy
-  - Golden path: complete sortie → crew currency → QA release on 614 → dashboard
+  - ./scripts/demo-prep.sh
+  - Login: anderson.robert / demo1234
+  - Golden path: readiness drill-down → maintenance/614 QA release → complete
+    sortie → crew currency + readiness card
 
-Phase 0/1 polish shipped:
-  - FMC all-clear state on Maintenance
-  - Complete Sortie validation warnings
-  - QA release success toast
-  - Squadron Snapshot rename (was "Readiness Board")
-  - SIM_TOFT seed sortie; third drift case (617 NMCS)
-
-Phase 2/3 shipped:
-  - pytest + GitHub Actions CI (postgres → pytest → npm build)
-  - SIM_TOFT gates CBR task credits on sim_eligible (currencies already gated)
-  - WTM readiness API + /readiness UI + dashboard/board integration
-
-Phase 4/5 shipped:
-  - Training boards API + instructor pairing + Boards tab on /training
-  - Syllabus progress on crew detail; gradecard PDF export
-  - SDO /ops console: schedule publish, watchbill, sortie ops status, ATO/brief PDFs
-  - Seed: watchbill, sample boards, today's schedule pre-published
-
-Next phase: maintenance deep-dive (#3), auth/RBAC (#6).
+Release history (demo tags):
+  rc1 — cascade + maintenance slice polish
+  rc2/rc3 — WTM readiness + SDO ops + training boards
+  rc4 — JWT auth, RBAC, assisted scheduling
+  rc5 — maintenance deep-dive (MAF/WO, logbook, forecast)
+  rc6 — readiness hardening (table-driven rules, PDF brief, aircrew rollup)
+  rc7 — demo polish (12-min script, demo-prep.sh, doc refresh)
 
 ================================================================================
 END OF DOCUMENT
