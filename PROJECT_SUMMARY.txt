@@ -1,9 +1,10 @@
 ================================================================================
 SQUADRON OPS v2 — PROJECT SUMMARY
 ================================================================================
-Last updated: June 2026
+Last updated: June 2026 (post Phase 0/1 — tag v2.0-demo-rc1)
 Repository: squadron-ops (forked from hsc-squadron-ops v1.0-demo)
 Community focus: HSC / MH-60S (single-squadron demo; multi-squadron deferred)
+Demo docs: DEMO_SCRIPT.txt (10-min walkthrough), DEMO_CHEATSHEET.txt (quick ref)
 
 ================================================================================
 1. PURPOSE AND THESIS
@@ -154,8 +155,10 @@ Aircraft status codes
 Stamped vs computed status
   Aircraft.status           Line-maintainer stamped value (what brief/OOMA shows)
   computed_status (API)     Derived from open discrepancies + overdue inspections
-  Intentional drift in seed: aircraft 614 and 615 stamped FMC but computed
-  PMC/NMCM for maintainer workflow demos.
+  Intentional drift in seed (use side numbers, not DB ids):
+    614 — stamped FMC, computed PMC (open MAJOR)
+    615 — stamped FMC, computed NMCM (DOWNING in work)
+    617 — stamped FMC, computed NMCS (DOWNING awaiting parts / AWP)
 
 Maintenance terminology (use in UI — NOT "RTS", which means Ready to Strike):
   QA signoff, QA release, release for flight, safe for flight
@@ -172,13 +175,14 @@ Typical seeded scale:
   - Wing Table B-2 currency types with ~88% current / ~8% expiring / ~4% expired
   - SWTP syllabus events across PILOT_CORE, PILOT_AMCM, AIRCREW tracks
   - 90+ historical sorties with flight logs, task credits, approaches
-  - Future scheduled sorties including today's flights for dashboard "Next 24h"
-  - Discrepancies aligned to aircraft status + 2 drift demo cases
+  - 12 future scheduled sorties including today's flights for dashboard "Next 24h"
+  - One SIM_TOFT sortie (P200 TOFT) for sim-eligible currency demo
+  - Discrepancies aligned to aircraft status + 3 drift demo cases (614/615/617)
   - 7 inspection types × 8 aircraft inspection rows
   - Historical gradecards, safety reports, qualifications
 
 Aircraft status mix (stamped):
-  4 FMC, 2 FMC (drift demos), 1 PMC, 1 NMCM
+  5 FMC (3 true + 2 drift at 614/615), 1 PMC (616), 1 FMC with NMCS drift (617)
   ~50% computed FMC after discrepancy logic
 
 ================================================================================
@@ -297,7 +301,7 @@ App shell (sidebar navigation, localhost:5174)
 Fullscreen TV boards (no sidebar)
   /board/ops                 Operations board
   /board/maint               Maintenance board
-  /board/readiness           Readiness board
+  /board/readiness           Squadron Snapshot board (operational metrics, not WTM)
 
 ================================================================================
 11. WORKING FEATURES (CURRENT DEMO STATE)
@@ -312,7 +316,8 @@ Operations and scheduling
 Flight logging and cascade (Phase B — verified)
   - Complete Sortie UI: per-crew night/NVG/instrument hours, role hours by position
   - "Apply mission profile to all crew" bulk fill
-  - flight_mode in completion payload
+  - flight_mode in completion payload (LIVE vs SIM_TOFT)
+  - Submit validation: takeoff/landing times, crew hours, activity/duration match
   - Cascade on complete: currency renewal (e.g. NIGHT_NVD on NVG flights),
     aircraft hour increment, task credits, discrepancies, safety reports
   - Training jacket per person
@@ -327,6 +332,7 @@ Maintenance (Phase A + C — demo-ready slice)
   - Inspection tracking with overdue detection and completion recording
   - QA release workflow: POST qa-release stamps line status after QA signoff;
     blocked when DOWNING discs remain, downing inspection overdue, or NMC*
+  - QA release success toast; Maintenance "all clear" card when no drift
   - Phase interval / hours-to-phase forecast on maintenance pages
 
 Training
@@ -338,16 +344,18 @@ Readiness
   - Per-person qualifications and Wing Table B-2 currencies
   - Currency type catalog with applicability rules
   - Dashboard currency warning counts
-  - Readiness TV board (partial — WTM T-rating math NOT implemented)
+  - Squadron Snapshot TV board (operational metrics only — WTM T-ratings NOT implemented)
 
 Governance
   - HTTP audit middleware logging consequential API actions
   - Admin page to browse audit log
 
-Demo credibility (Phase A)
+Demo credibility (Phases A + Phase 0/1)
   - Currency seed distribution (~88% current, not wall of red)
-  - Aircraft status mix with intentional drift cases (614 PMC, 615 NMCM)
+  - Three drift scenarios: 614→PMC, 615→NMCM, 617→NMCS
   - Today's sorties on dashboard "Next 24 Hours"
+  - Production build passes (npm run build)
+  - Tagged demo baseline: v2.0-demo-rc1
 
 ================================================================================
 12. SORTIE COMPLETION CASCADE (SPINE OF THE APP)
@@ -424,8 +432,7 @@ From KNOWN_ISSUES.md and development notes:
   - HSC-specific syllabus/currency catalog (community templates later)
   - datetime.utcnow() deprecation warnings in seed.py
   - Readiness Board: 41 N+1 gradecard fetches (performance)
-  - Frontend tsc build has pre-existing strict-null errors in Admin.tsx,
-    CompleteSortie.tsx, SortieDetail.tsx (dev server runs; production build may fail)
+  - Frontend production build fixed as of v2.0-demo-rc1 (npm run build passes)
   - WTM T-rating math stubbed / not implemented
   - Sim sortie (TOFT) currency credit rules not enforced
   - Full 4790 configuration management deferred
@@ -469,21 +476,25 @@ Legacy currency codes (avoid in new logic): NVG, NIGHT_DL — use NIGHT_NVD from
 18. DEMO READINESS ASSESSMENT (JUNE 2026)
 ================================================================================
 
-External browser review rated the platform demo-ready for a 10-minute
-walkthrough. Core cascade (sortie completion → currency → maintenance status)
-works without critical errors.
+Status: demo-ready at tag v2.0-demo-rc1 (Phase 0/1 complete).
 
-Recommended before stakeholder demo:
-  - Reseed database to restore drift cases on aircraft 614/615 if API testing
-    consumed them
-  - Walk through: complete sortie → verify currency on crew page → QA release
-    on drift aircraft → confirm dashboard counts update
-  - Avoid using "RTS" in conversation; say QA release / release for flight
+External browser review rated the platform credible for a 10-minute walkthrough.
+Core cascade (sortie completion → currency → maintenance status) works without
+critical errors.
 
-Suggested polish (not blockers):
-  - FMC empty state on maintenance page when all aircraft green
-  - Complete Sortie validation warnings (landing time, crew positions)
-  - Success toast after QA release
+Before every stakeholder demo:
+  - Reseed: cd backend && python seed.py
+  - Follow DEMO_SCRIPT.txt; keep DEMO_CHEATSHEET.txt handy
+  - Golden path: complete sortie → crew currency → QA release on 614 → dashboard
+
+Phase 0/1 polish shipped:
+  - FMC all-clear state on Maintenance
+  - Complete Sortie validation warnings
+  - QA release success toast
+  - Squadron Snapshot rename (was "Readiness Board")
+  - SIM_TOFT seed sortie; third drift case (617 NMCS)
+
+Next phase (Phase 2): pytest smoke tests, CI pipeline, sim credit gating on CBR tasks.
 
 ================================================================================
 END OF DOCUMENT
