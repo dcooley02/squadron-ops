@@ -4,8 +4,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.deps import require_roles
 from app.database import get_db
-from app.models.models import BoardSchedule, BoardStatus, Person, SyllabusEvent
+from app.models.models import BoardSchedule, BoardStatus, Person, Role, SyllabusEvent
 from app.schemas.boards import BoardScheduleCreate, BoardScheduleOut, InstructorCandidate
 from app.services.instructor_pairing import rank_instructors
 
@@ -62,7 +63,11 @@ def list_boards(
 
 
 @router.post("", response_model=BoardScheduleOut, status_code=201)
-def create_board(payload: BoardScheduleCreate, db: Session = Depends(get_db)):
+def create_board(
+    payload: BoardScheduleCreate,
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.TRAINING_O, Role.CO_XO)),
+):
     if not db.query(Person).filter(Person.id == payload.examinee_person_id).first():
         raise HTTPException(status_code=404, detail="Examinee not found")
     if payload.instructor_person_id and not db.query(Person).filter(

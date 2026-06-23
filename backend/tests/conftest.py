@@ -3,10 +3,12 @@ import os
 from datetime import datetime, timedelta
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.database import Base
+from app.database import Base, get_db
+from app.main import app
 from app.models import models  # noqa: F401
 from app.models.models import (
     Aircraft,
@@ -55,6 +57,17 @@ def engine():
     Base.metadata.create_all(eng)
     yield eng
     eng.dispose()
+
+
+@pytest.fixture
+def client(db: Session):
+    def _override_get_db():
+        yield db
+
+    app.dependency_overrides[get_db] = _override_get_db
+    with TestClient(app) as c:
+        yield c
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture

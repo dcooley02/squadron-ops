@@ -5,11 +5,41 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+const storedToken = localStorage.getItem("squadron_ops_token");
+if (storedToken) {
+  api.defaults.headers.common.Authorization = `Bearer ${storedToken}`;
+}
+
 // ---------- Type definitions matching the backend schemas ----------
 
 export type Role =
   | "pilot" | "aircrew" | "sdo"
   | "training_officer" | "maint_control" | "co_xo" | "admin";
+
+// ---------- Auth ----------
+
+export interface UserMe {
+  id: number;
+  username: string;
+  last_name: string;
+  first_name: string;
+  callsign: string | null;
+  rank: string | null;
+  role: Role;
+}
+
+export const login = async (username: string, password: string): Promise<{ access_token: string }> => {
+  const { data } = await api.post<{ access_token: string; token_type: string }>("/api/auth/login", {
+    username,
+    password,
+  });
+  return data;
+};
+
+export const fetchMe = async (): Promise<UserMe> => {
+  const { data } = await api.get<UserMe>("/api/auth/me");
+  return data;
+};
 
 export type AircraftStatus = "FMC" | "PMC" | "NMC" | "NMCM" | "NMCS";
 
@@ -465,6 +495,70 @@ export const removeCrew = async (sortieId: number, flightLogId: number): Promise
 
 export const deleteSortie = async (id: number): Promise<void> => {
   await api.delete(`/api/scheduling/sorties/${id}`);
+};
+
+export interface CrewSuggestionSlot {
+  crew_position: CrewPosition;
+  suggestions: EligibleCrewmember[];
+  recommended_person_id: number | null;
+}
+
+export interface SuggestCrewResponse {
+  sortie_id: number;
+  slots: CrewSuggestionSlot[];
+  conflicts: FitnessWarning[];
+}
+
+export const suggestCrew = async (sortieId: number): Promise<SuggestCrewResponse> => {
+  const { data } = await api.post<SuggestCrewResponse>(
+    `/api/scheduling/sorties/${sortieId}/suggest-crew`
+  );
+  return data;
+};
+
+export const applyCrewSuggestions = async (
+  sortieId: number,
+  payload: { person_id: number; crew_position: CrewPosition }[]
+): Promise<{ assigned: FlightLogCreate[]; skipped: string[] }> => {
+  const { data } = await api.post(`/api/scheduling/sorties/${sortieId}/apply-suggestions`, payload);
+  return data;
+};
+
+export interface ProposedCrewAssignment {
+  crew_position: CrewPosition;
+  person_id: number;
+  last_name: string;
+  first_name: string;
+  reasons: string[];
+}
+
+export interface ProposedSortie {
+  stub_index: number;
+  event_type: string | null;
+  event_code: string | null;
+  aircraft_id: number | null;
+  takeoff_time: string;
+  duration_hours: number | null;
+  suggested_crew: ProposedCrewAssignment[];
+  warnings: FitnessWarning[];
+}
+
+export const proposeWeek = async (body: {
+  missions: {
+    event_type?: string;
+    event_code?: string;
+    aircraft_id?: number;
+    takeoff_time: string;
+    land_time?: string;
+    duration_hours?: number;
+    positions?: CrewPosition[];
+  }[];
+}): Promise<{ proposals: ProposedSortie[] }> => {
+  const { data } = await api.post<{ proposals: ProposedSortie[] }>(
+    "/api/scheduling/propose-week",
+    body
+  );
+  return data;
 };
 
 // ---------- Syllabus / Training types ----------

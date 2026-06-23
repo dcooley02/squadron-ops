@@ -3,8 +3,9 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_roles
 from app.database import get_db
-from app.models.models import Sortie, SortieOpsStatus
+from app.models.models import Person, Role, Sortie, SortieOpsStatus
 from app.schemas.ops import (
     DayOpsOut,
     SchedulePublishRequest,
@@ -30,12 +31,13 @@ def publish_day_schedule(
     ops_date: date,
     body: SchedulePublishRequest,
     db: Session = Depends(get_db),
+    user: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
 ):
     try:
         pub = publish_schedule(
             db,
             ops_date,
-            body.published_by_person_id,
+            body.published_by_person_id or user.id,
             body.remarks,
         )
     except ValueError as exc:
@@ -63,6 +65,7 @@ def patch_sortie_ops_status(
     sortie_id: int,
     body: SortieOpsStatusPatch,
     db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
 ):
     sortie = db.query(Sortie).filter(Sortie.id == sortie_id).first()
     if not sortie:
@@ -79,7 +82,11 @@ def patch_sortie_ops_status(
 
 
 @router.post("/watchbill", response_model=WatchbillEntryOut, status_code=201)
-def create_watchbill_entry(body: WatchbillEntryCreate, db: Session = Depends(get_db)):
+def create_watchbill_entry(
+    body: WatchbillEntryCreate,
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
+):
     from app.models.models import Person, WatchbillEntry
 
     person = db.query(Person).filter(Person.id == body.person_id).first()

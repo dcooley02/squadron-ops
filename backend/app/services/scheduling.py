@@ -11,7 +11,17 @@ from app.models.models import (
     Person, Sortie, FlightLog, Qualification, Currency, SyllabusEvent,
     Role, CrewPosition, AircraftStatus,
 )
-from app.schemas.scheduling import EligibleCrewmember, SortieFitness, FitnessWarning
+from app.schemas.scheduling import (
+    EligibleCrewmember,
+    SortieFitness,
+    FitnessWarning,
+    CrewSuggestionSlot,
+    SuggestCrewResponse,
+    WeekMissionStub,
+    ProposedSortie,
+    ProposedCrewAssignment,
+    ProposeWeekResponse,
+)
 
 
 # ─── Low-level helpers ────────────────────────────────────────────────────────
@@ -360,7 +370,22 @@ def compute_fitness(db: Session, sortie_id: int) -> Optional[SortieFitness]:
                 target="sortie",
             ))
 
-    # ── Overall status ────────────────────────────────────────────────────────
+    # ── Schedule conflicts (double-booking, same-day load) ─────────────────
+    for fl in sortie.flight_logs:
+        conflict_msgs = detect_person_conflicts(
+            db,
+            fl.person_id,
+            sortie.takeoff_time,
+            sortie.land_time or sortie.takeoff_time,
+            exclude_sortie_id=sortie.id,
+        )
+        for msg in conflict_msgs:
+            warnings.append(FitnessWarning(
+                severity="red" if "double-booked" in msg.lower() else "yellow",
+                message=msg,
+                target=f"person:{fl.person_id}",
+            ))
+
     if any(w.severity == "red" for w in warnings):
         overall = "red"
     elif any(w.severity == "yellow" for w in warnings):
@@ -369,3 +394,164 @@ def compute_fitness(db: Session, sortie_id: int) -> Optional[SortieFitness]:
         overall = "green"
 
     return SortieFitness(overall_status=overall, warnings=warnings)
+
+
+def _sortie_window(sortie: Sortie) -> tuple[datetime, datetime]:
+    start = sortie.takeoff_time or datetime.utcnow()
+    end = sortie.land_time
+    if not end or end <= start:
+        end = start + timedelta(hours=sortie.duration_hours or 2.0)
+    return start, end
+
+
+def _windows_overlap(a_start: datetime, a_end: datetime, b_start: datetime, b_end: datetime) -> bool:
+    return a_start < b_end and b_start < a_end
+
+
+def detect_person_conflicts(
+    db: Session,
+    person_id: int,
+    window_start: datetime,
+    window_end: datetime,
+    *,
+    exclude_sortie_id: int | None = None,
+) -> list[str]:
+    """Return human-readable conflict messages for a person in a time window."""
+    if window_end < window_start:
+        window_end = window_start + timedelta(hours=2)
+
+    q = (
+        db.query(Sortie)
+        .join(FlightLog, FlightLog.sortie_id == Sortie.id)
+        .filter(
+            FlightLog.person_id == person_id,
+            Sortie.is_complete == False,
+            Sortie.takeoff_time.isnot(None),
+        )
+    )
+    if exclude_sortie_id is not None:
+        q = q.filter(Sortie.id != exclude_sortie_id)
+
+    messages: list[str] = []
+    same_day = 0
+    sortie_day = window_start.date()
+
+    for other in q.all():
+        o_start, o_end = _sortie_window(other)
+        if _windows_overlap(window_start, window_end, o_start, o_end):
+            messages.append(
+                f"Double-booked with sortie #{other.id} ({other.event_code or other.event_type or 'flight'})"
+            )
+        if o_start.date() == sortie_day:
+            same_day += 1
+
+    if same_day >= 2:
+        messages.append(f"Assigned to {same_day + 1} sorties same day — crew-rest review")
+
+    return messages
+
+
+def suggest_crew_for_sortie(db: Session, sortie: Sortie) -> SuggestCrewResponse:
+    """Ranked suggestions for each unfilled crew slot on a sortie."""
+    filled = {fl.crew_position for fl in sortie.flight_logs}
+    target_positions = [
+        CrewPosition.HAC,
+        CrewPosition.CREW_CHIEF,
+        CrewPosition.H2P,
+        CrewPosition.H2P_U,
+        CrewPosition.AIRCREW,
+        CrewPosition.AWS,
+    ]
+    open_positions = [p for p in target_positions if p not in filled]
+
+    slots: list[CrewSuggestionSlot] = []
+    assigned_ids = {fl.person_id for fl in sortie.flight_logs}
+    conflicts: list[FitnessWarning] = []
+
+    for pos in open_positions:
+        ranked = get_eligible_crew(db, sortie, pos)
+        pick = next((c for c in ranked if c.person_id not in assigned_ids), None)
+        if pick:
+            for msg in detect_person_conflicts(
+                db,
+                pick.person_id,
+                sortie.takeoff_time,
+                sortie.land_time or sortie.takeoff_time,
+                exclude_sortie_id=sortie.id,
+            ):
+                conflicts.append(FitnessWarning(
+                    severity="red" if "double-booked" in msg.lower() else "yellow",
+                    message=f"{pick.last_name}: {msg}",
+                    target=f"person:{pick.person_id}",
+                ))
+        slots.append(CrewSuggestionSlot(
+            crew_position=pos,
+            suggestions=ranked[:5],
+            recommended_person_id=pick.person_id if pick else None,
+        ))
+
+    return SuggestCrewResponse(sortie_id=sortie.id, slots=slots, conflicts=conflicts)
+
+
+def propose_week(db: Session, missions: list[WeekMissionStub]) -> ProposeWeekResponse:
+    """Draft week schedule with ranked crew picks — not persisted."""
+    proposals: list[ProposedSortie] = []
+    reserved_by_day: dict[date, set[int]] = {}
+
+    for idx, stub in enumerate(missions):
+        sortie = Sortie(
+            event_type=stub.event_type,
+            event_code=stub.event_code,
+            aircraft_id=stub.aircraft_id,
+            takeoff_time=stub.takeoff_time,
+            land_time=stub.land_time,
+            duration_hours=stub.duration_hours,
+            is_complete=False,
+        )
+        day_key = stub.takeoff_time.date()
+        reserved = reserved_by_day.setdefault(day_key, set())
+        suggested: list[ProposedCrewAssignment] = []
+        warnings: list[FitnessWarning] = []
+
+        for pos in stub.positions:
+            ranked = get_eligible_crew(db, sortie, pos)
+            pick = next((c for c in ranked if c.person_id not in reserved), None)
+            if not pick:
+                warnings.append(FitnessWarning(
+                    severity="yellow",
+                    message=f"No eligible crew for {pos.value}",
+                    target=pos.value,
+                ))
+                continue
+            reserved.add(pick.person_id)
+            for msg in detect_person_conflicts(
+                db,
+                pick.person_id,
+                stub.takeoff_time,
+                stub.land_time or stub.takeoff_time,
+            ):
+                warnings.append(FitnessWarning(
+                    severity="red" if "double-booked" in msg.lower() else "yellow",
+                    message=f"{pick.last_name}: {msg}",
+                    target=f"person:{pick.person_id}",
+                ))
+            suggested.append(ProposedCrewAssignment(
+                crew_position=pos,
+                person_id=pick.person_id,
+                last_name=pick.last_name,
+                first_name=pick.first_name,
+                reasons=pick.reasons,
+            ))
+
+        proposals.append(ProposedSortie(
+            stub_index=idx,
+            event_type=stub.event_type,
+            event_code=stub.event_code,
+            aircraft_id=stub.aircraft_id,
+            takeoff_time=stub.takeoff_time,
+            duration_hours=stub.duration_hours,
+            suggested_crew=suggested,
+            warnings=warnings,
+        ))
+
+    return ProposeWeekResponse(proposals=proposals)

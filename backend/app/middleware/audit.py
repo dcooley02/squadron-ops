@@ -66,7 +66,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             try:
                 db = SessionLocal()
                 db.add(AuditLog(
-                    actor=None,  # B6 will set this from the authenticated user
+                    actor=getattr(request.state, "username", None),
                     method=method,
                     path=path,
                     query_string=request.url.query or None,

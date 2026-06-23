@@ -7,8 +7,9 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_roles
 from app.database import get_db
-from app.models.models import AuditLog
+from app.models.models import AuditLog, Person, Role
 
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
@@ -35,6 +36,7 @@ def list_audit_log(
     path_contains: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.ADMIN, Role.CO_XO)),
 ):
     q = db.query(AuditLog)
     if method:

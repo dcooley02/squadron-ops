@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { Link } from "react-router-dom";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { fetchUpcomingSorties, fetchSortieFitness, type SortieSummary } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import SortieTile from "../components/SortieTile";
 import NewFlightModal from "../components/NewFlightModal";
+import ProposeWeekModal from "../components/ProposeWeekModal";
 import Loading from "../components/Loading";
 
 function sortiesForDay(sorties: SortieSummary[], day: Date): SortieSummary[] {
@@ -17,7 +19,10 @@ function sortiesForDay(sorties: SortieSummary[], day: Date): SortieSummary[] {
 export default function Schedule() {
   const today = startOfDay(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(today);
+  const { hasRole } = useAuth();
+  const canManageSchedule = hasRole("sdo", "co_xo");
   const [showNewFlight, setShowNewFlight] = useState(false);
+  const [showProposeWeek, setShowProposeWeek] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
 
   const { data: sorties, isLoading } = useQuery({
@@ -71,13 +76,24 @@ export default function Schedule() {
           >
             Ops console →
           </Link>
-          <button
-            onClick={() => setShowNewFlight(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white"
-          >
-            <Plus size={14} />
-            New Flight
-          </button>
+          {canManageSchedule && (
+            <button
+              onClick={() => setShowProposeWeek(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border border-slate-600 hover:bg-slate-800 text-slate-200"
+            >
+              <Sparkles size={14} />
+              Propose Week
+            </button>
+          )}
+          {canManageSchedule && (
+            <button
+              onClick={() => setShowNewFlight(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white"
+            >
+              <Plus size={14} />
+              New Flight
+            </button>
+          )}
         </div>
       </div>
 
@@ -197,6 +213,7 @@ export default function Schedule() {
           onCreated={() => setShowNewFlight(false)}
         />
       )}
+      {showProposeWeek && <ProposeWeekModal onClose={() => setShowProposeWeek(false)} />}
     </div>
   );
 }
