@@ -1,7 +1,7 @@
 ================================================================================
 SQUADRON OPS v2 — DEMO CHEATSHEET
 ================================================================================
-Baseline: v2.0-demo-rc6 · 36 pytest · 61 CBR task options seeded
+Baseline: v2.0-demo-rc8 · 37 pytest · 61 CBR task options seeded
 
 ONE-COMMAND PREP
   ./scripts/demo-prep.sh
@@ -68,7 +68,7 @@ QUICK PATHS
 PDF EXPORTS (need WeasyPrint on backend)
   Readiness brief:     /readiness → Export PDF
   ATO:                 /ops → Export ATO PDF
-  Brief sheet:         sortie detail → brief sheet link
+  Brief sheet:         sortie detail → Export Brief Sheet PDF
   Gradecard:           gradecard detail → Export PDF
   Logbook:             logbook page → Download PDF
 

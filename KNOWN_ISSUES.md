@@ -6,29 +6,29 @@ The v1 demo is preserved at https://github.com/dcooley02/hsc-squadron-ops
 order.
 
 ## Active scope
-See ROADMAP.md for long-term commitments. Demo baseline: `v2.0-demo-rc6`.
+See ROADMAP.md for long-term commitments. Demo baseline: `v2.0-demo-rc8`.
 
 ## Carried-over technical debt from v1
 - LOW papercuts deferred: crew header filter count, donut tooltip,
-  sortie year display, 41 N+1 gradecard fetches on Squadron Snapshot board
+  sortie year display
 - datetime.utcnow() deprecation warnings in seed.py (3 instances)
 - HSC-specific syllabus and currency catalog (will be replaced by
   per-community templates in a future batch)
 
-## Demo polish notes (June 2026 — rc6)
+## Demo polish notes (June 2026 — rc8)
 - Demo prep script: `./scripts/demo-prep.sh`
 - Walkthrough: `DEMO_SCRIPT.txt` (12 min), quick ref: `DEMO_CHEATSHEET.txt`
 - PDF exports require WeasyPrint in the backend venv (503 if missing)
-- Direct `<a href>` PDF links (ATO, brief sheet) do not send JWT — use in-app
-  buttons where auth matters (readiness brief, logbook use blob download)
+- PDF downloads use `PdfExportButton` + `lib/pdf.ts` (JWT blob download, friendly errors)
 
-## Auth / RBAC (rc4)
+## Auth / RBAC (rc8)
 - JWT login required for `/api/*` (except `/api/auth/login`)
 - Demo password `demo1234` for all seeded users
 - Password reset not implemented
-- Role-filtered sidebar; some routes use `require_roles` on write endpoints
+- **Demo mode:** all authenticated users see every nav item and can hit write
+  endpoints; `require_roles()` authenticates only — re-enable role checks before production
 
-## Readiness (rc6)
+## Readiness (rc6+)
 - WTM T-ratings are table-driven (anchor tasks + area config) with simplified
   Appendix D math — hand-check before claiming full CHSCWPINST 3500.1F parity
 - CBR library seeded at 61 tasks (scaffolding; full Enclosure 2 parity still open)
@@ -42,12 +42,12 @@ See ROADMAP.md for long-term commitments. Demo baseline: `v2.0-demo-rc6`.
 - Crew ranking and week proposals are transparent heuristics, not optimization
 - Human-in-the-loop only — no auto-publish
 
-## SDO ops (rc3)
+## SDO ops (rc3+)
 - Ops status is manual advance (no automatic airborne detection)
 - Comms/freq management intentionally out of scope per ROADMAP
 
 ## Testing
-- pytest suite: 36 tests, Postgres required (`TEST_DATABASE_URL`)
+- pytest suite: 37 tests, Postgres required (`TEST_DATABASE_URL`)
 - CI: GitHub Actions (postgres → pytest → npm build)
 
 ## Architecture invariants (don't break these)

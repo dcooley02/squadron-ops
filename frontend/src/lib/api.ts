@@ -1192,6 +1192,7 @@ export interface DayOps {
   } | null;
   watchbill: Array<{
     id: number;
+    duty_date: string;
     role: WatchbillRole;
     person_id: number;
     person_name: string;

@@ -9,15 +9,16 @@ v1.0-demo (single-tenant HSC prototype). See `ROADMAP.md` for scope and
 
 ## Status
 
-**Demo baseline: `v2.0-demo-rc6`** — integrated ops, training, maintenance,
-WTM readiness, JWT/RBAC, and assisted scheduling on realistic HSC/MH-60S seed data.
+**Demo baseline: `v2.0-demo-rc8`** — integrated ops, training, maintenance,
+WTM readiness, JWT auth (open demo access), and assisted scheduling on realistic
+HSC/MH-60S seed data.
 
 ## Stack
 
 - Backend: FastAPI + SQLAlchemy 2.0 + PostgreSQL 16 + Alembic, Python 3.12
 - Frontend: React 18 + TypeScript + Vite + Tailwind CSS + TanStack Query
 - Database: PostgreSQL via Docker Compose (host port 5433)
-- Auth: JWT + role-based access (demo password `demo1234` for all seeded users)
+- Auth: JWT login required; all authenticated users see full nav for demo (demo password `demo1234`)
 
 ## Quickstart
 
@@ -42,7 +43,7 @@ see `DEMO_CHEATSHEET.txt` for other demo accounts.
 ## Verify
 
 ```bash
-cd backend && pytest -q          # 36 tests (requires Postgres on :5433)
+cd backend && pytest -q          # 37 tests (requires Postgres on :5433)
 cd frontend && npm run build
 ```
 

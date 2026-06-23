@@ -2,11 +2,11 @@
 SQUADRON OPS v2 — 12-MINUTE DEMO SCRIPT
 ================================================================================
 Audience: SDO, maintainer, senior aviator, or program manager
-Baseline: tag v2.0-demo-rc6
+Baseline: tag v2.0-demo-rc8
 Prerequisite: ./scripts/demo-prep.sh (or manual reseed), servers on :5174 / :8001
 
 --------------------------------------------------------------------------------
-MINUTE 0 | LOGIN — ROLE-AWARE ACCESS
+MINUTE 0 | LOGIN — AUTHENTICATED ACCESS
 --------------------------------------------------------------------------------
 Open: http://localhost:5174/login
 
@@ -19,8 +19,9 @@ Default demo accounts (password for all: demo1234):
 Action: Log in as anderson.robert (SDO)
 
 Talking points:
-  - JWT auth with role-filtered navigation (not open API anymore)
-  - Same dataset, different views by role — closer to how a squadron actually runs
+  - JWT auth required for all API routes (not open API anymore)
+  - Demo mode: every logged-in user sees full sidebar — use different accounts
+    to show role-appropriate talking points (SDO vs pilot vs maint), not nav limits
 
 --------------------------------------------------------------------------------
 MINUTE 0–1 | DASHBOARD — SITUATIONAL AWARENESS
@@ -170,6 +171,6 @@ GOLDEN PATH CHECKLIST (verify before high-stakes demo)
 [ ] QA release on 614 succeeds with toast
 [ ] QA release on 615 blocked
 [ ] Complete one sortie → crew currency date advances
-[ ] pytest passes (36 tests) and npm run build passes
+[ ] pytest passes (37 tests) and npm run build passes
 
 ================================================================================

@@ -22,6 +22,7 @@ export default function PdfExportButton({
   const [error, setError] = useState<string | null>(null);
 
   async function handleClick() {
+    if (loading) return;
     setError(null);
     setLoading(true);
     try {
