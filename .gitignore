@@ -9,4 +9,10 @@ build/
 .vite/
 *.log
 .DS_Store
+
+# Editor and tooling
+.idea/
+.vscode/
+*.swp
 .claude/
+.grok/
