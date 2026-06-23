@@ -6,8 +6,17 @@ from datetime import date, datetime, timedelta
 
 from app.database import get_db
 from app.models.models import Aircraft, AircraftInspection, InspectionType, Discrepancy, DiscrepancyWorkStatus
-from app.schemas.aircraft import InspectionTypeOut, AircraftInspectionOut, DiscrepancyOut, DiscrepancyUpdate, InspectionUpdate
+from app.schemas.aircraft import (
+    AircraftDetail,
+    InspectionTypeOut,
+    AircraftInspectionOut,
+    DiscrepancyOut,
+    DiscrepancyUpdate,
+    InspectionUpdate,
+    QaReleaseRequest,
+)
 from app.services.aircraft_status import is_inspection_overdue
+from app.services.qa_release import qa_release
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
 
@@ -158,3 +167,29 @@ def update_aircraft_inspection(
         "last_completion_notes": insp.last_completion_notes,
         "is_overdue": overdue,
     })
+
+
+@router.post("/aircraft/{aircraft_id}/qa-release", response_model=AircraftDetail)
+def aircraft_qa_release(
+    aircraft_id: int,
+    body: QaReleaseRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    QA release: optionally close discrepancies, then stamp aircraft.status to computed status.
+    Blocked while DOWNING discrepancies remain, downing inspections are overdue, or not safe for flight.
+    """
+    if not body.qa_notes.strip():
+        raise HTTPException(status_code=400, detail="qa_notes is required")
+
+    try:
+        return qa_release(db, aircraft_id, body)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"message": "Release blocked — not safe for flight", "blockers": list(exc.args[0])},
+        ) from exc

@@ -37,12 +37,13 @@ def compute_totals(logs: list) -> dict:
         instr_role   += fl.instructor_hours or 0.0
         spec_crew    += fl.special_crew_time_hours or 0.0
 
-        ldg_day       += s.landings_day or 0
-        ldg_night     += s.landings_night or 0
-        ldg_dve_day   += s.landings_dve_day or 0
-        ldg_dve_night += s.landings_dve_night or 0
-        ldg_ship_day  += s.landings_shipboard_day or 0
-        ldg_ship_night += s.landings_shipboard_night or 0
+        if s.id not in sortie_ids:
+            ldg_day       += s.landings_day or 0
+            ldg_night     += s.landings_night or 0
+            ldg_dve_day   += s.landings_dve_day or 0
+            ldg_dve_night += s.landings_dve_night or 0
+            ldg_ship_day  += s.landings_shipboard_day or 0
+            ldg_ship_night += s.landings_shipboard_night or 0
 
         for appr in fl.instrument_approaches:
             approaches_total += 1

@@ -14,7 +14,7 @@ See README.md, ROADMAP.md, and KNOWN_ISSUES.md for scope and status.
 - `backend/app/schemas/` — Pydantic request/response schemas
 - `backend/app/api/` — FastAPI route handlers, organized by feature
 - `backend/app/core/` — auth, config, shared utilities
-- `backend/app/services/` — business logic (cascade, currency, scheduling, logbook)
+- `backend/app/services/` — business logic (cascade, currency, scheduling, logbook, qa_release)
 - `backend/alembic/` — database migrations
 - `frontend/src/pages/` — top-level page components
 - `frontend/src/components/` — reusable components
@@ -42,6 +42,12 @@ H2P_U (Unqualified 2P/under instruction), CREW_CHIEF, AIRCREW, AWS
 ### Aircraft status codes
 FMC (Fully Mission Capable), PMC (Partially Mission Capable),
 NMC (Non-Mission Capable), NMCM (NMC for Maintenance), NMCS (NMC for Supply)
+
+**Stamped vs. computed:** `Aircraft.status` is the line-maintainer stamped value;
+`computed_status` is derived from open discrepancies and overdue inspections.
+After QA signoff, maintainers **release** the aircraft **safe for flight** via
+`POST /api/maintenance/aircraft/{id}/qa-release` — do not use "RTS" (conflicts with
+Ready to Strike). UI copy: QA release, release for flight, safe for flight.
 
 ### Qualifications (subset for demo)
 H2P, HAC, NVG, FCP (Functional Check Pilot), NSI (NATOPS Standardization Instructor),

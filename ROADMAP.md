@@ -13,7 +13,7 @@ Audience is intentionally undefined. Anyone from squadron CO to TYCOM N7 to NAVA
 ## Scope commitments (locked decisions)
 
 - **Readiness Reports — full WTM math.** Real T-1/T-2/T-3 thresholds, capability area rollups per CHSCWPINST 3500.1F Appendix D. Not stubbed. Math has to survive a senior aviator reading it.
-- **Maintenance — full 4790 chain.** MAF, work orders, job control, work center routing, QA signoff, RTS, phase tracking, BCM/AWP/AWM, aircraft logbook (ASR/MSR/equipment history). Not just the maintainer-facing slice.
+- **Maintenance — full 4790 chain.** MAF, work orders, job control, work center routing, QA signoff, QA release (safe for flight), phase tracking, BCM/AWP/AWM, aircraft logbook (ASR/MSR/equipment history). Not just the maintainer-facing slice.
 - **Task option library — full Appendix D Enclosure 2 task list per capability area.** The current 20-entry library is treated as scaffolding, not the deliverable.
 - **Scope is single squadron until single squadron is undeniable.** Multi-tenancy is deferred until after a real conversation with a wing or NAVAIR.
 
@@ -50,17 +50,17 @@ Audience is intentionally undefined. Anyone from squadron CO to TYCOM N7 to NAVA
 
 **Done means:**
 - MAF data model with full field set per 4790.2 series
-- Work order chain modeled: discrepancy → MAF → JCN → work center → corrective action → QA signoff → RTS
+- Work order chain modeled: discrepancy → MAF → JCN → work center → corrective action → QA signoff → QA release (safe for flight)
 - Phase inspection tracking (200-hr for MH-60S, plus calendar-based items)
 - BCM, AWP, AWM logic for parts and supply
 - Aircraft logbook: ASR, MSR, equipment history records
 - Phase forecasting: given flight hour projections, when does each aircraft hit phase?
-- RTS projections: given open discrepancies and parts status, when is each aircraft FMC?
-- Maintainer-facing workflow: ADB sign-out, discrepancy entry from the line, QA signoff path
+- Release projections: given open discrepancies and parts status, when is each aircraft FMC / safe for flight?
+- Maintainer-facing workflow: ADB sign-out, discrepancy entry from the line, QA signoff and release path
 
 **Decision points:** How much of the configuration management side of 4790 to model. Full config management (TD compliance, equipment tracking by serial) is a separate large lift. Recommend deferring config management to a later batch unless it surfaces as demo-relevant.
 
-**Risk:** OOMA is 30 years of accumulated doctrine. Plan for this batch to take longer than any other. Break into sub-batches: data model first, then discrepancy/MAF workflow, then signoffs and RTS, then phase, then logbook, then forecasting. Verify each before moving on.
+**Risk:** OOMA is 30 years of accumulated doctrine. Plan for this batch to take longer than any other. Break into sub-batches: data model first, then discrepancy/MAF workflow, then QA signoff and release, then phase, then logbook, then forecasting. Verify each before moving on.
 
 ### 4. Training — syllabus, boards, instructor pairings
 **Why fourth:** With #2 done, the readiness side of SHARP is replaced. This batch replaces the training-management side: syllabus progression, board scheduling, instructor assignment, gradesheets. Together with #2 this is the "SHARP replacement" half of the pitch.

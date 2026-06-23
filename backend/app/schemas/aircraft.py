@@ -98,3 +98,9 @@ class AircraftDetail(AircraftSummary):
     @property
     def hours_to_phase(self) -> float:
         return self.phase_interval - self.hours_since_phase
+
+
+class QaReleaseRequest(BaseModel):
+    qa_notes: str
+    close_discrepancy_ids: Optional[List[int]] = None
+    corrective_action: Optional[str] = None

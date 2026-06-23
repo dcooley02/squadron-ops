@@ -4,9 +4,10 @@ from typing import List, Optional
 from datetime import date
 
 from app.database import get_db
-from app.models.models import Aircraft, AircraftStatus, AircraftInspection, Discrepancy, DiscrepancyWorkStatus
-from app.schemas.aircraft import AircraftSummary, AircraftDetail, DiscrepancyOut
-from app.services.aircraft_status import compute_status, is_inspection_overdue
+from app.models.models import Aircraft, AircraftStatus, AircraftInspection
+from app.schemas.aircraft import AircraftSummary, AircraftDetail
+from app.services.aircraft_detail import build_aircraft_detail, open_discrepancies, overdue_inspections
+from app.services.aircraft_status import compute_status
 
 router = APIRouter(prefix="/api/aircraft", tags=["aircraft"])
 
@@ -35,11 +36,8 @@ def list_aircraft(
     today = date.today()
     results = []
     for ac in rows:
-        open_discs = [d for d in ac.discrepancies if d.work_status != DiscrepancyWorkStatus.CLOSED]
-        overdue_insps = [
-            insp for insp in ac.inspections
-            if is_inspection_overdue(insp, today, ac.total_airframe_hours)
-        ]
+        open_discs = open_discrepancies(ac)
+        overdue_insps = overdue_inspections(ac, today)
         computed = compute_status(ac, open_discs, overdue_insps)
         summary = AircraftSummary.model_validate(ac)
         summary.computed_status = computed
@@ -62,25 +60,4 @@ def get_aircraft(aircraft_id: int, db: Session = Depends(get_db)):
     if not ac:
         raise HTTPException(status_code=404, detail=f"Aircraft {aircraft_id} not found")
 
-    today = date.today()
-    open_discs = [d for d in ac.discrepancies if d.work_status != DiscrepancyWorkStatus.CLOSED]
-    overdue_insps = [
-        insp for insp in ac.inspections
-        if is_inspection_overdue(insp, today, ac.total_airframe_hours)
-    ]
-    status = compute_status(ac, open_discs, overdue_insps)
-
-    open_disc_out = [DiscrepancyOut.model_validate(d) for d in ac.discrepancies if d.is_open]
-    return AircraftDetail(
-        id=ac.id,
-        bureau_number=ac.bureau_number,
-        side_number=ac.side_number,
-        type_model_series=ac.type_model_series,
-        total_airframe_hours=ac.total_airframe_hours,
-        hours_since_phase=ac.hours_since_phase,
-        phase_interval=ac.phase_interval,
-        status=ac.status,
-        manual_status_override=ac.manual_status_override,
-        computed_status=status,
-        open_discrepancies=open_disc_out,
-    )
+    return build_aircraft_detail(ac)

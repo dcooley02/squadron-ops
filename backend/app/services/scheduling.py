@@ -76,6 +76,8 @@ def _currencies_sortie_refreshes(sortie: Sortie) -> set[str]:
     refreshed: set[str] = set()
     if sortie.event_type and "SAR" in sortie.event_type.upper():
         refreshed.update({"SAR_DAY", "SAR_NIGHT"})
+    if _requires_nvg(sortie) or _is_night(sortie):
+        refreshed.add("NIGHT_NVD")
     return refreshed
 
 
@@ -155,17 +157,13 @@ def get_eligible_crew(
         if crew_position == CrewPosition.HAC:
             if not is_qualified(person, "HAC", sortie_date):
                 continue
-            if requires_nvg and not has_current_currency(person, "NVG", sortie_date):
-                continue
-            if is_night and not has_current_currency(person, "NIGHT_DL", sortie_date):
+            if (requires_nvg or is_night) and not has_current_currency(person, "NIGHT_NVD", sortie_date):
                 continue
 
         elif crew_position == CrewPosition.H2P:
             if not is_qualified(person, "H2P", sortie_date):
                 continue
-            if requires_nvg and not has_current_currency(person, "NVG", sortie_date):
-                continue
-            if is_night and not has_current_currency(person, "NIGHT_DL", sortie_date):
+            if (requires_nvg or is_night) and not has_current_currency(person, "NIGHT_NVD", sortie_date):
                 continue
 
         elif crew_position == CrewPosition.H2P_U:
@@ -173,10 +171,7 @@ def get_eligible_crew(
             # Qualified pilot goes here only on training (event_code present)
             if has_h2p and not sortie.event_code:
                 continue
-            # NVG/night still applies for H2P_U flying those missions
-            if requires_nvg and not has_current_currency(person, "NVG", sortie_date):
-                continue
-            if is_night and not has_current_currency(person, "NIGHT_DL", sortie_date):
+            if (requires_nvg or is_night) and not has_current_currency(person, "NIGHT_NVD", sortie_date):
                 continue
 
         # CREW_CHIEF, AIRCREW, AWS: any active aircrew member is eligible
@@ -274,16 +269,10 @@ def compute_fitness(db: Session, sortie_id: int) -> Optional[SortieFitness]:
                     message=f"{person.last_name} lacks a current HAC qualification",
                     target=target,
                 ))
-            if requires_nvg and not has_current_currency(person, "NVG", sortie_date):
+            if (requires_nvg or is_night) and not has_current_currency(person, "NIGHT_NVD", sortie_date):
                 warnings.append(FitnessWarning(
                     severity="red",
-                    message=f"{person.last_name} NVG currency expired/missing (NVG sortie)",
-                    target=target,
-                ))
-            if is_night and not has_current_currency(person, "NIGHT_DL", sortie_date):
-                warnings.append(FitnessWarning(
-                    severity="red",
-                    message=f"{person.last_name} NIGHT_DL currency expired (night sortie)",
+                    message=f"{person.last_name} NIGHT_NVD currency expired/missing (night/NVG sortie)",
                     target=target,
                 ))
 
@@ -294,16 +283,10 @@ def compute_fitness(db: Session, sortie_id: int) -> Optional[SortieFitness]:
                     message=f"{person.last_name} lacks a current H2P qualification",
                     target=target,
                 ))
-            if requires_nvg and not has_current_currency(person, "NVG", sortie_date):
+            if (requires_nvg or is_night) and not has_current_currency(person, "NIGHT_NVD", sortie_date):
                 warnings.append(FitnessWarning(
                     severity="red",
-                    message=f"{person.last_name} NVG currency expired/missing (NVG sortie)",
-                    target=target,
-                ))
-            if is_night and not has_current_currency(person, "NIGHT_DL", sortie_date):
-                warnings.append(FitnessWarning(
-                    severity="red",
-                    message=f"{person.last_name} NIGHT_DL currency expired (night sortie)",
+                    message=f"{person.last_name} NIGHT_NVD currency expired/missing (night/NVG sortie)",
                     target=target,
                 ))
 
