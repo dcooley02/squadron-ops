@@ -18,6 +18,7 @@ import {
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
+import { useToast } from "../components/Toast";
 import { formatDate } from "../lib/dates";
 
 // ── Status display helpers ──────────────────────────────────────────────────
@@ -94,11 +95,13 @@ function QaReleaseModal({
   openDiscs,
   inspections,
   onClose,
+  onReleased,
 }: {
   ac: { id: number; status: AircraftStatus; computed_status: AircraftStatus; side_number: string | null };
   openDiscs: Discrepancy[];
   inspections: AircraftInspection[];
   onClose: () => void;
+  onReleased: (side: string | null, from: AircraftStatus, to: AircraftStatus) => void;
 }) {
   const qc = useQueryClient();
   const [qaNotes, setQaNotes] = useState("");
@@ -120,12 +123,13 @@ function QaReleaseModal({
         close_discrepancy_ids: closeIds.size > 0 ? [...closeIds] : undefined,
         corrective_action: correctiveAction.trim() || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       qc.invalidateQueries({ queryKey: ["aircraft-detail", ac.id] });
       qc.invalidateQueries({ queryKey: ["aircraft-discrepancies", ac.id] });
       qc.invalidateQueries({ queryKey: ["aircraft-inspections", ac.id] });
       qc.invalidateQueries({ queryKey: ["aircraft"] });
       qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      onReleased(ac.side_number, ac.status, updated.status);
       onClose();
     },
   });
@@ -648,6 +652,7 @@ export default function AircraftMaintenance() {
   const { aircraftId } = useParams<{ aircraftId: string }>();
   const id = Number(aircraftId);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const { showToast } = useToast();
 
   const { data: ac, isLoading: acLoading } = useQuery({
     queryKey: ["aircraft-detail", id],
@@ -804,6 +809,12 @@ export default function AircraftMaintenance() {
           openDiscs={openDiscs}
           inspections={inspections ?? []}
           onClose={() => setReleaseOpen(false)}
+          onReleased={(side, from, to) =>
+            showToast(
+              `${side ?? "Aircraft"} released safe for flight — line status ${from} → ${to}`,
+              "success"
+            )
+          }
         />
       )}
 

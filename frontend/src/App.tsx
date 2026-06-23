@@ -21,6 +21,7 @@ import BoardIndex from "./pages/BoardIndex";
 import OpsBoard from "./board/OpsBoard";
 import MaintenanceBoard from "./board/MaintenanceBoard";
 import ReadinessBoard from "./board/ReadinessBoard";
+import { ToastProvider } from "./components/Toast";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +35,7 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ToastProvider>
       <BrowserRouter>
         <Routes>
           {/* App shell — renders with sidebar nav */}
@@ -63,6 +65,7 @@ export default function App() {
           <Route path="/board/readiness" element={<ReadinessBoard />} />
         </Routes>
       </BrowserRouter>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

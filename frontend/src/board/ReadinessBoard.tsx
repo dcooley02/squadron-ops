@@ -98,14 +98,19 @@ export default function ReadinessBoard() {
   const openDiscrepancies = dashboard?.open_discrepancies_count ?? 0;
 
   return (
-    <BoardLayout boardName="READINESS BOARD" lastUpdatedAt={dataUpdatedAt}>
+    <BoardLayout boardName="SQUADRON SNAPSHOT" lastUpdatedAt={dataUpdatedAt}>
       <div className="flex flex-col h-full overflow-hidden">
 
         {/* Header */}
         <div className="shrink-0 px-8 py-3 border-b border-slate-800 flex items-baseline justify-between">
-          <h2 className="text-3xl font-bold uppercase tracking-wide text-slate-100">
-            Squadron Readiness
-          </h2>
+          <div>
+            <h2 className="text-3xl font-bold uppercase tracking-wide text-slate-100">
+              Squadron Snapshot
+            </h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Operational metrics — WTM T-ratings planned for a future release
+            </p>
+          </div>
           <span className="text-xl text-slate-400 font-medium">
             {format(new Date(), "EEEE, MMMM d, yyyy")}
           </span>

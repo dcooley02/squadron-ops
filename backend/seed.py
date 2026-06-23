@@ -657,13 +657,13 @@ def wipe(db):
 # Aircraft
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Stamped statuses: 4 true FMC, 2 FMC with intentional drift (computed PMC/NMCM),
-# 1 PMC, 1 NMCM — targets ~50% computed FMC with 2 drift demos.
+# Stamped statuses: 3 true FMC, 3 FMC with intentional drift (PMC/NMCM/NMCS),
+# 1 PMC, 1 NMCM — targets ~50% computed FMC with 3 drift demos.
 _AC_STATUSES = [
     AircraftStatus.FMC, AircraftStatus.FMC, AircraftStatus.FMC, AircraftStatus.FMC,
     AircraftStatus.FMC, AircraftStatus.FMC,
     AircraftStatus.PMC,
-    AircraftStatus.NMCM,
+    AircraftStatus.FMC,  # drift_nmcs_ac: stamped FMC + DOWNING AWP → computed NMCS
 ]
 
 
@@ -1338,12 +1338,14 @@ _CLOSED = [
 
 def seed_discrepancies(db, aircraft_list):
     """
-    Open discrepancies aligned with stamped status and two intentional drift cases:
+    Open discrepancies aligned with stamped status and three intentional drift cases:
     aircraft_list[4] stamped FMC + open MAJOR → computed PMC;
-    aircraft_list[5] stamped FMC + open DOWNING → computed NMCM.
+    aircraft_list[5] stamped FMC + open DOWNING IN_WORK → computed NMCM;
+    aircraft_list[7] stamped FMC + open DOWNING AWP → computed NMCS.
     """
     drift_pmc_ac = aircraft_list[4]
     drift_nmcm_ac = aircraft_list[5]
+    drift_nmcs_ac = aircraft_list[7]
     maf_counter  = 1
     count_by_sev = {"MINOR": 0, "MAJOR": 0, "DOWNING": 0}
 
@@ -1378,6 +1380,9 @@ def seed_discrepancies(db, aircraft_list):
             _add(ac, desc, sys, DiscrepancySeverity.MAJOR, ws)
         elif ac == drift_nmcm_ac:
             desc, sys, ws = _NMCM[0]
+            _add(ac, desc, sys, DiscrepancySeverity.DOWNING, ws)
+        elif ac == drift_nmcs_ac:
+            desc, sys, ws = _NMCS[0]
             _add(ac, desc, sys, DiscrepancySeverity.DOWNING, ws)
         elif ac.status == AircraftStatus.NMCM:
             desc, sys, ws = random.choice(_NMCM)
@@ -1653,14 +1658,15 @@ def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list)
     log_count    = 0
 
     def _add(flight_date, to_hour, event_type, event_code, ac,
-             day_h, night_h, nvg_h, instr_h, dur, notes, crew):
+             day_h, night_h, nvg_h, instr_h, dur, notes, crew,
+             flight_mode=FlightMode.LIVE):
         nonlocal sortie_count, log_count
         to_dt = datetime(flight_date.year, flight_date.month, flight_date.day, to_hour, 0)
         s = Sortie(
             event_type=event_type, event_code=event_code, aircraft_id=ac.id,
             brief_time=to_dt - timedelta(hours=1, minutes=30), takeoff_time=to_dt,
             land_time=to_dt + timedelta(hours=dur), duration_hours=dur,
-            is_complete=False, flight_mode=FlightMode.LIVE, notes=notes,
+            is_complete=False, flight_mode=flight_mode, notes=notes,
         )
         db.add(s)
         db.flush()
@@ -1701,6 +1707,12 @@ def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list)
     _add(day3, 9,  "CSAR", "P225", fmc[3 % len(fmc)], 2.5, 0.0, 0.0, 0.0, 2.5,
          "P225 Deliberate CSAR Overland — datum runs and hoist survivor drills.",
          [(h4, CrewPosition.HAC), (p4, CrewPosition.H2P), (c4, CrewPosition.CREW_CHIEF)])
+
+    h4s = _hac(3 % len(hac_pilots)); u4s = _h2p_u(0)
+    _add(day3, 15, "INTRO", "P200", fmc[4 % len(fmc)], 2.0, 0.0, 0.0, 0.0, 2.0,
+         "P200 PGM/SACT TOFT sim — sim-eligible currencies only; aircraft hours not incremented.",
+         [(h4s, CrewPosition.HAC), (u4s, CrewPosition.H2P_U)],
+         flight_mode=FlightMode.SIM_TOFT)
 
     h5 = _hac(3 % len(hac_pilots)); p5 = _h2p({h5.id}, 2)
     _add(day4, 10, "PROFICIENCY", None, fmc[4 % len(fmc)], 2.0, 0.0, 0.0, 0.0, 2.0,

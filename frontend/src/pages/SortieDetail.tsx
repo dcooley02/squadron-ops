@@ -356,11 +356,11 @@ function CrewRow({ fl }: { fl: FlightLogOut }) {
         </div>
         <div className="text-right shrink-0">
           <div className="text-sm text-slate-400">{fl.hours_logged.toFixed(1)} hrs</div>
-          {(fl.night_hours > 0 || fl.nvg_hours > 0 || fl.actual_instrument_hours > 0) && (
+          {((fl.night_hours ?? 0) > 0 || (fl.nvg_hours ?? 0) > 0 || (fl.actual_instrument_hours ?? 0) > 0) && (
             <div className="text-[10px] text-slate-500 mt-0.5">
-              {fl.night_hours > 0 && `${fl.night_hours.toFixed(1)}N `}
-              {fl.nvg_hours > 0 && `${fl.nvg_hours.toFixed(1)}NVG `}
-              {fl.actual_instrument_hours > 0 && `${fl.actual_instrument_hours.toFixed(1)}I`}
+              {(fl.night_hours ?? 0) > 0 && `${(fl.night_hours ?? 0).toFixed(1)}N `}
+              {(fl.nvg_hours ?? 0) > 0 && `${(fl.nvg_hours ?? 0).toFixed(1)}NVG `}
+              {(fl.actual_instrument_hours ?? 0) > 0 && `${(fl.actual_instrument_hours ?? 0).toFixed(1)}I`}
             </div>
           )}
         </div>

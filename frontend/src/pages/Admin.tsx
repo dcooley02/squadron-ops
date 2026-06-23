@@ -7,7 +7,6 @@ import {
   fetchAuditLog,
   type CurrencyTypeOut,
   type PersonSummary,
-  type AuditLogEntry,
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
