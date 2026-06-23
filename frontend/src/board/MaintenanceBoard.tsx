@@ -32,7 +32,7 @@ const STATUS_CARD_TINT: Record<AircraftStatus, string> = {
 const SEVERITY_COLOR: Record<string, string> = {
   MINOR: "text-slate-400",
   MAJOR: "text-yellow-400",
-  GROUNDING: "text-red-400",
+  DOWNING: "text-red-400",
 };
 
 export default function MaintenanceBoard() {

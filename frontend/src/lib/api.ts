@@ -114,6 +114,67 @@ export interface Discrepancy {
   // CNAF M-4790.2
   type_wo_code?: string | null;
   jcn?: string | null;
+  reported_by_name?: string | null;
+  work_order_id?: number | null;
+  work_center_code?: string | null;
+  has_qa_signoff?: boolean;
+}
+
+export interface WorkCenter {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+}
+
+export interface WorkOrder {
+  id: number;
+  jcn: string;
+  type_wo_code: string;
+  aircraft_id: number;
+  maf_id: number | null;
+  discrepancy_id: number | null;
+  work_center_id: number | null;
+  work_center_code: string | null;
+  work_center_name: string | null;
+  status: DiscrepancyWorkStatus;
+  corrective_action: string | null;
+  opened_date: string;
+  assigned_at: string | null;
+  completed_at: string | null;
+  maf_number: string | null;
+  has_qa_signoff: boolean;
+}
+
+export interface LogbookEntry {
+  id: number;
+  aircraft_id: number;
+  entry_type: string;
+  entry_date: string;
+  hours_at_entry: number | null;
+  title: string;
+  description: string | null;
+  work_order_id: number | null;
+  sortie_id: number | null;
+  created_by_name: string | null;
+}
+
+export interface PhaseForecastRow {
+  aircraft_id: number;
+  side_number: string | null;
+  hours_since_phase: number;
+  hours_to_phase: number;
+  weekly_flight_hours_assumed: number;
+  projected_phase_date: string | null;
+}
+
+export interface ReleaseForecast {
+  aircraft_id: number;
+  computed_status: string;
+  blockers: string[];
+  projected_release_date: string | null;
+  open_discrepancy_count: number;
+  open_work_order_count: number;
 }
 
 // backward compat alias
@@ -867,6 +928,78 @@ export const qaRelease = async (
   const { data } = await api.post<AircraftDetail>(
     `/api/maintenance/aircraft/${aircraftId}/qa-release`,
     body
+  );
+  return data;
+};
+
+export const fetchWorkCenters = async (): Promise<WorkCenter[]> => {
+  const { data } = await api.get<WorkCenter[]>("/api/maintenance/work-centers");
+  return data;
+};
+
+export const fetchWorkOrders = async (aircraftId: number): Promise<WorkOrder[]> => {
+  const { data } = await api.get<WorkOrder[]>(
+    `/api/maintenance/aircraft/${aircraftId}/work-orders`
+  );
+  return data;
+};
+
+export const createDiscrepancy = async (
+  aircraftId: number,
+  body: {
+    description: string;
+    severity?: DiscrepancySeverity;
+    system_affected?: string;
+    notes?: string;
+    type_wo_code?: string;
+    work_center_id?: number;
+  }
+): Promise<Discrepancy> => {
+  const { data } = await api.post<Discrepancy>(
+    `/api/maintenance/aircraft/${aircraftId}/discrepancies`,
+    body
+  );
+  return data;
+};
+
+export const patchWorkOrder = async (
+  workOrderId: number,
+  body: {
+    status?: DiscrepancyWorkStatus;
+    corrective_action?: string;
+    work_center_id?: number;
+  }
+): Promise<WorkOrder> => {
+  const { data } = await api.patch<WorkOrder>(`/api/maintenance/work-orders/${workOrderId}`, body);
+  return data;
+};
+
+export const qaSignoffWorkOrder = async (
+  workOrderId: number,
+  body: { notes: string; release_eligible?: boolean }
+): Promise<void> => {
+  await api.post(`/api/maintenance/work-orders/${workOrderId}/qa-signoff`, body);
+};
+
+export const fetchLogbook = async (aircraftId: number): Promise<LogbookEntry[]> => {
+  const { data } = await api.get<LogbookEntry[]>(
+    `/api/maintenance/aircraft/${aircraftId}/logbook`
+  );
+  return data;
+};
+
+export const fetchPhaseForecast = async (
+  weeklyFlightHours = 25
+): Promise<PhaseForecastRow[]> => {
+  const { data } = await api.get<PhaseForecastRow[]>("/api/maintenance/forecast/phase", {
+    params: { weekly_flight_hours: weeklyFlightHours },
+  });
+  return data;
+};
+
+export const fetchReleaseForecast = async (aircraftId: number): Promise<ReleaseForecast> => {
+  const { data } = await api.get<ReleaseForecast>(
+    `/api/maintenance/forecast/release/${aircraftId}`
   );
   return data;
 };

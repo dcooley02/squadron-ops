@@ -22,8 +22,7 @@ def _julian_day(d: datetime) -> str:
 
 def assign_jcn(db: Session, *, opened_date: datetime, model) -> str:
     """Return the next JCN for the given day. Caller is responsible for the
-    DB commit. The `model` argument is the Discrepancy class (avoids a circular
-    import at module load time).
+    DB commit. The `model` argument is WorkOrder or Discrepancy (legacy).
     """
     jul = _julian_day(opened_date)
     prefix = f"{ORG_CODE}{jul}"
@@ -32,6 +31,13 @@ def assign_jcn(db: Session, *, opened_date: datetime, model) -> str:
         .filter(model.jcn.like(f"{prefix}%"))
         .scalar()
     )
+    if existing_max is None:
+        from app.models.models import Discrepancy
+        existing_max = (
+            db.query(func.max(Discrepancy.jcn))
+            .filter(Discrepancy.jcn.like(f"{prefix}%"))
+            .scalar()
+        )
     if existing_max:
         # Extract trailing 3 digits as the serno
         try:
