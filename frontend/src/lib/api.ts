@@ -1069,19 +1069,14 @@ export const fetchPersonReadiness = async (
   return data;
 };
 
-export const downloadReadinessBriefPdf = async (): Promise<void> => {
-  const response = await api.get("/api/readiness/squadron/brief.pdf", {
-    responseType: "blob",
-  });
-  const blobUrl = URL.createObjectURL(response.data as Blob);
-  const a = document.createElement("a");
-  a.href = blobUrl;
-  a.download = "readiness_brief.pdf";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(blobUrl);
-};
+export {
+  downloadReadinessBriefPdf,
+  downloadAtoPdf,
+  downloadBriefSheetPdf,
+  downloadGradecardPdf,
+  pdfErrorMessage,
+  PDF_UNAVAILABLE_MSG,
+} from "./pdf";
 
 // ---------- Training boards (Phase 4) ----------
 
@@ -1164,8 +1159,7 @@ export const fetchSyllabusProgress = async (
   return data;
 };
 
-export const gradecardPdfUrl = (gradecardId: number): string =>
-  `${api.defaults.baseURL}/api/syllabus/gradecards/${gradecardId}/pdf`;
+
 
 // ---------- SDO ops (Phase 5) ----------
 
@@ -1234,8 +1228,3 @@ export const patchSortieOpsStatus = async (
   await api.patch(`/api/ops/sorties/${sortieId}/status`, body);
 };
 
-export const atoPdfUrl = (opsDate: string): string =>
-  `${api.defaults.baseURL}/api/ops/day/${opsDate}/ato.pdf`;
-
-export const briefSheetPdfUrl = (sortieId: number): string =>
-  `${api.defaults.baseURL}/api/ops/sorties/${sortieId}/brief-sheet.pdf`;

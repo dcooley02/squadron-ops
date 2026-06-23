@@ -4,7 +4,6 @@ import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { Link } from "react-router-dom";
 import { Plus, Sparkles } from "lucide-react";
 import { fetchUpcomingSorties, fetchSortieFitness, type SortieSummary } from "../lib/api";
-import { useAuth } from "../context/AuthContext";
 import SortieTile from "../components/SortieTile";
 import NewFlightModal from "../components/NewFlightModal";
 import ProposeWeekModal from "../components/ProposeWeekModal";
@@ -19,8 +18,6 @@ function sortiesForDay(sorties: SortieSummary[], day: Date): SortieSummary[] {
 export default function Schedule() {
   const today = startOfDay(new Date());
   const [selectedDay, setSelectedDay] = useState<Date>(today);
-  const { hasRole } = useAuth();
-  const canManageSchedule = hasRole("sdo", "co_xo");
   const [showNewFlight, setShowNewFlight] = useState(false);
   const [showProposeWeek, setShowProposeWeek] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
@@ -76,24 +73,20 @@ export default function Schedule() {
           >
             Ops console →
           </Link>
-          {canManageSchedule && (
-            <button
-              onClick={() => setShowProposeWeek(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border border-slate-600 hover:bg-slate-800 text-slate-200"
-            >
-              <Sparkles size={14} />
-              Propose Week
-            </button>
-          )}
-          {canManageSchedule && (
-            <button
-              onClick={() => setShowNewFlight(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white"
-            >
-              <Plus size={14} />
-              New Flight
-            </button>
-          )}
+          <button
+            onClick={() => setShowProposeWeek(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border border-slate-600 hover:bg-slate-800 text-slate-200"
+          >
+            <Sparkles size={14} />
+            Propose Week
+          </button>
+          <button
+            onClick={() => setShowNewFlight(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white"
+          >
+            <Plus size={14} />
+            New Flight
+          </button>
         </div>
       </div>
 

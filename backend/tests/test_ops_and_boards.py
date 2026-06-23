@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 
 from app.models.models import BoardType, SortieOpsStatus
 from app.services.instructor_pairing import rank_instructors
-from app.services.ops_day import publish_schedule
+from app.schemas.ops import DayOpsOut
+from app.services.ops_day import build_day_ops, publish_schedule
 
 
 def test_rank_instructors_excludes_examinee(db, pilot, cbr_tasks):
@@ -52,6 +53,16 @@ def test_publish_schedule_sets_sorties_published(db, pilot, aircraft):
     assert pub.schedule_date == tomorrow
     assert sortie.ops_status == SortieOpsStatus.PUBLISHED
     assert sortie.schedule_publication_id == pub.id
+
+
+def test_build_day_ops_matches_schema(db):
+    from datetime import date
+
+    out = DayOpsOut.model_validate(build_day_ops(db, date.today()))
+    assert out.ops_date == date.today()
+    assert out.sortie_count >= 0
+    for entry in out.watchbill:
+        assert entry.duty_date is not None
 
 
 def test_publish_schedule_idempotent_guard(db):

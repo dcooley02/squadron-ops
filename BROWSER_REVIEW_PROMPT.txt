@@ -1,0 +1,343 @@
+================================================================================
+SQUADRON OPS v2 — BROWSER PLUGIN COMPREHENSIVE DEMO REVIEW
+================================================================================
+Copy everything below the line into your browser agent / plugin.
+
+--------------------------------------------------------------------------------
+
+You are performing a **comprehensive, hands-on review** of Squadron Ops v2 — a
+naval aviation operations web demo (HSC / MH-60S). Your job is to determine
+whether this build is **credible and demo-ready** for a mixed audience of SDOs,
+maintainers, senior aviators, and program managers.
+
+Be thorough, skeptical, and specific. Execute real clicks and form submissions —
+do not infer behavior from static HTML alone.
+
+## Environment
+
+| Item | Value |
+|------|-------|
+| App URL | http://localhost:5174 |
+| Login | http://localhost:5174/login |
+| API | http://localhost:8001 |
+| Demo baseline | v2.0-demo-rc7 |
+| Password (all users) | `demo1234` |
+
+### Preflight
+
+1. Load http://localhost:5174/login — if unreachable, stop and report *environment down*.
+2. If pages load but data is empty, stale, or drift scenarios are missing, note
+   *"Run `./scripts/demo-prep.sh`"* and continue with whatever data exists.
+3. Log in as **`mitchell.james`** (line pilot) for the main review pass.
+4. Spot-check **`admin`** only if you need to verify Admin/Audit after the main pass.
+
+### Access model (important)
+
+- **Login required** for all app routes (unauthenticated → redirect to `/login`).
+- **All authenticated users see every page and nav item** — RBAC is deferred.
+  Do NOT fail the review because a pilot can open `/ops` or `/maintenance`.
+- Any **403 Forbidden** on API calls while logged in **is a bug** and must be
+  reported as Critical.
+
+---
+
+## Review method
+
+For each section below:
+1. Navigate to the route(s)
+2. Interact with primary controls (buttons, modals, forms, exports)
+3. Note console errors and failed network requests
+4. Score **1–5** (1 = broken, 3 = works but rough, 5 = demo-ready)
+5. Capture screenshots at failure points and at each golden-path milestone
+
+---
+
+## Section 1 — Login & chrome
+
+**Routes:** `/login`, any page after login
+
+Check:
+- Login form: demo account hints visible, clear error on bad password
+- Successful login lands on Dashboard; sidebar shows **all 11 items**:
+  Dashboard, Crew, Aircraft, Sorties, Schedule, Ops, Readiness, Training,
+  Maintenance, TV Board, Admin
+- **My Jacket** link in sidebar works
+- Sign out returns to login; protected routes redirect when logged out
+- User identity shown in sidebar (rank, name, callsign)
+- No layout overflow, broken icons, or unreadable text in sidebar/header
+
+---
+
+## Section 2 — Dashboard (`/`)
+
+Check:
+- Personnel summary, aircraft readiness cards, currency warnings populate
+- **Stamped vs computed** status is understandable without training
+- WTM capability strip visible and links to `/readiness`
+- "Next 24 Hours" shows today's sorties (expect entries after fresh reseed)
+- Drift/maintenance callout if 614/615/617 scenarios present
+- All links and cards navigate correctly
+
+---
+
+## Section 3 — WTM Readiness (`/readiness`)
+
+This is the **"better than SHARP"** moment. Be rigorous.
+
+Check:
+- All 8 capability areas render: MOB, FSO, ASU, SOF, PR, STW, LOG, MIW
+- Squadron overall T-rating and per-area T-1/T-2/T-3 counts
+- Click an area → drill-down with per-pilot:
+  - Contributing factors (plain language, not empty for T-2/T-3 pilots)
+  - Anchor task status: current / stale / absent with days-since
+  - T-1/T-2 window days shown
+- Aircrew section present below pilot matrix
+- **Export PDF** button: downloads PDF or shows clear 503/error (not silent fail)
+- Page copy distinguishes WTM T-ratings from Table B-2 currency (Dashboard)
+
+Domain flag: implausible all-T-3 squadron, missing areas, or factors that
+contradict visible task/currency data.
+
+---
+
+## Section 4 — Maintenance (`/maintenance`, `/maintenance/{id}`)
+
+Check squadron rollup (`/maintenance`):
+- Computed FMC/PMC/NMC stat strip (not stamped-only)
+- Phase forecast and release forecast cards
+- Aircraft cards show stamped vs computed when they differ
+- Yellow drift banner when applicable
+
+Check aircraft detail (find side numbers on cards — **ids change each reseed**):
+| Side | Expected after reseed |
+|------|----------------------|
+| 614 | Stamped FMC, computed PMC — QA release should **succeed** |
+| 615 | DOWNING in work — QA release **blocked** with clear reason |
+| 617 | AWP / NMCS drift — QA release **blocked** |
+
+On detail page verify:
+- Inspections list with overdue/downing indicators
+- Open discrepancies show MAF numbers, JCN, work status, type WO
+- Work order chain visible (not orphaned discrepancies)
+- Aircraft logbook entries
+- Per-tail release forecast
+- **New discrepancy** modal submits without error
+- **Update discrepancy** modal works
+- **QA Release** modal: success toast on 614; blocker message on 615/617
+- Terminology: "QA release / safe for flight" — **never "RTS"**
+
+---
+
+## Section 5 — Sortie cascade (core demo spine)
+
+**Routes:** `/sorties`, `/sorties/{id}`, `/sorties/{id}/complete`, `/crew/{id}`
+
+Execute end-to-end:
+1. Find an **incomplete** sortie (best: day+2 evening ASU P211 for NVG/night)
+2. Open Complete Sortie
+3. Verify validation warnings for missing times/hours
+4. Fill takeoff/landing, per-crew hours; use "Apply mission profile" if present
+5. Submit successfully (no console errors, no failed POST)
+
+Then on assigned HAC crew page (`/crew/{id}`):
+- Applicable currency renewed (e.g. NIGHT_NVD date advanced)
+- WTM readiness card shows area ratings
+- Degraded areas show anchor task breakdown
+
+Optional: complete SIM_TOFT P200 (day+3) — sim-ineligible currencies should not
+advance incorrectly.
+
+---
+
+## Section 6 — Schedule & assisted scheduling (`/schedule`)
+
+Check:
+- 7-day view loads with sortie tiles
+- **New Flight** and **Propose Week** buttons visible and functional
+- On an unmanned sortie: **Suggest crew** returns rankings; assignment applies
+- Propose Week: generates proposals; accepting one creates a sortie
+- Fitness indicators (green/yellow/red borders) and warnings readable
+- Crew assign/remove on tiles works
+- Delete sortie confirmation works
+
+---
+
+## Section 7 — SDO Ops (`/ops`)
+
+Check:
+- Day ops view loads; date picker changes data
+- Schedule publish control works (or shows meaningful error if already published)
+- Watchbill entries visible
+- Sortie ops status can be advanced
+- **Export ATO PDF** — note if link fails (direct href may omit JWT; blob
+  download preferred). Record behavior, don't auto-fail unless page breaks.
+
+---
+
+## Section 8 — Training (`/training`, gradecards)
+
+Check:
+- Syllabus events list loads
+- Boards tab: scheduled boards, instructor pairing suggestions
+- Create/open a gradecard; fill view works
+- Gradecard **Export PDF**
+- `/crew/{id}` syllabus progress card
+
+---
+
+## Section 9 — Crew, aircraft, logbook
+
+| Route | Check |
+|-------|-------|
+| `/crew` | List loads; links to detail |
+| `/crew/{id}` | Quals, currencies, training jacket, readiness (pilots + aircrew) |
+| `/aircraft` | List with computed status |
+| `/aircraft/{id}` | Hours, status, linked sorties |
+| `/logbook/{personId}` | Entries render; **Download PDF** works (authenticated) |
+
+---
+
+## Section 10 — TV boards (fullscreen)
+
+**Routes:** `/board`, `/board/readiness`, `/board/ops`, `/board/maint`
+
+Check:
+- Readable from ~10 feet (large type, high contrast, no clipped tables)
+- Readiness board WTM strip consistent with `/readiness`
+- Data present, not skeleton placeholders
+- No horizontal scroll on 1920×1080
+
+---
+
+## Section 11 — Admin (`/admin`)
+
+Check:
+- Audit log loads with recent entries
+- Entries show **actor** (username) for consequential actions you performed
+  (sortie complete, QA release, schedule publish)
+- Filtering/pagination usable if present
+
+---
+
+## Section 12 — Technical health
+
+Throughout the review, collect:
+- **Console:** every `error` and `warning` with route and reproduction step
+- **Network:** every 4xx/5xx with method, URL, request context
+- Broken images, React error boundaries, infinite spinners, frozen modals
+- Pages >3s to first meaningful paint without loading indicator
+- Mobile/tablet spot-check: `/maintenance` and `/schedule` at 768px width
+
+---
+
+## Golden path (mandatory execution log)
+
+Run in order. Mark each **PASS / FAIL / SKIP** with one-line evidence.
+
+| # | Step | Pass criteria |
+|---|------|---------------|
+| 1 | Login as mitchell.james | Dashboard loads, full sidebar |
+| 2 | Visit every sidebar route | Each page loads without error boundary |
+| 3 | Readiness → click MOB | Anchor drill-down + factors visible |
+| 4 | Readiness → Export PDF | Download or explicit error message |
+| 5 | Maintenance → open 614 | MAF/WO + logbook visible |
+| 6 | QA Release on 614 | Success toast; stamped syncs |
+| 7 | QA Release on 615 | Blocked with readable reason |
+| 8 | Complete one sortie | POST succeeds; currency updates on crew page |
+| 9 | Schedule → Suggest crew | Rankings shown; assignment applies |
+| 10 | Admin audit log | Prior actions appear with actor |
+
+---
+
+## Known simplifications (do NOT report as bugs)
+
+- WTM math is simplified Appendix D — not full Enclosure 2 parity
+- CBR library is 61 seeded tasks, not complete Enclosure 2
+- Assisted scheduling is heuristic ranking, not optimization
+- Password reset not implemented
+- Per-route RBAC not enforced — all pages open to any logged-in user
+- Direct `<a href>` PDF links (ATO, brief sheet) may 401 without JWT
+
+---
+
+## Output format (use exactly this structure)
+
+```markdown
+# Squadron Ops v2 — Browser Review Report
+
+**Date:**
+**Plugin / agent:**
+**Baseline:** v2.0-demo-rc7
+**Environment reachable:** Yes / No
+**Reseed recommended:** Yes / No
+**Demo-ready verdict:** Yes / No / With fixes
+
+## Executive summary
+(3–5 sentences. Lead with verdict. Name the single biggest strength and blocker.)
+
+## Scores (1–5)
+
+| Area | Score | One-line rationale |
+|------|-------|-------------------|
+| Login & chrome | | |
+| Dashboard | | |
+| WTM Readiness | | |
+| Maintenance / 4790 | | |
+| Sortie cascade | | |
+| Assisted scheduling | | |
+| SDO Ops | | |
+| Training | | |
+| Crew / logbook | | |
+| TV boards | | |
+| Admin / audit | | |
+| Technical health | | |
+| Domain credibility | | |
+
+## Golden path results
+
+| Step | Result | Evidence |
+|------|--------|----------|
+| 1 Login | | |
+| 2 All routes | | |
+| 3 Readiness drill-down | | |
+| 4 Readiness PDF | | |
+| 5 Maintenance 614 | | |
+| 6 QA release 614 | | |
+| 7 QA blocked 615 | | |
+| 8 Sortie cascade | | |
+| 9 Suggest crew | | |
+| 10 Audit log | | |
+
+## Critical (demo-stoppers)
+-
+
+## Major (fix before stakeholder demo)
+-
+
+## Minor (polish)
+-
+
+## Console errors
+| Route | Message | Reproduction |
+|-------|---------|--------------|
+
+## Network failures
+| Method | URL | Status | Context |
+|--------|-----|--------|---------|
+
+## Domain credibility (aviator / maintainer lens)
+-
+
+## What works well (call out positives)
+-
+
+## Recommended fix order
+1.
+2.
+3.
+```
+
+Report every issue with: **URL, visible UI text, side number or sortie context,
+and expected vs actual behavior.** Prefer actionable fixes over vague criticism.
+
+================================================================================

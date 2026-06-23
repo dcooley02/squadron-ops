@@ -35,7 +35,7 @@ def test_api_requires_auth(client):
     assert resp.status_code == 401
 
 
-def test_audit_requires_admin_role(client, db):
+def test_audit_accessible_to_authenticated_user(client, db):
     password = "demo1234"
     pilot = Person(
         last_name="Line",
@@ -51,4 +51,4 @@ def test_audit_requires_admin_role(client, db):
     login = client.post("/api/auth/login", json={"username": "line.pilot", "password": password})
     token = login.json()["access_token"]
     resp = client.get("/api/audit", headers={"Authorization": f"Bearer {token}"})
-    assert resp.status_code == 403
+    assert resp.status_code == 200

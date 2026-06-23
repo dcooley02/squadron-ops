@@ -6,12 +6,13 @@ import {
   fetchDayOps,
   publishSchedule,
   patchSortieOpsStatus,
-  atoPdfUrl,
-  briefSheetPdfUrl,
+  downloadAtoPdf,
+  downloadBriefSheetPdf,
   type SortieOpsStatus,
   type DayOpsSortie,
 } from "../lib/api";
 import Loading from "../components/Loading";
+import PdfExportButton from "../components/PdfExportButton";
 import Badge from "../components/Badge";
 import { useToast } from "../components/Toast";
 
@@ -64,9 +65,18 @@ export default function Ops() {
 
   if (isLoading) return <Loading message="Loading day-of ops..." />;
   if (error || !data) {
+    const detail =
+      error && typeof error === "object" && "message" in error
+        ? String((error as { message: string }).message)
+        : null;
     return (
       <div className="card border-red-600/50 bg-red-950/20 text-red-300">
-        Failed to load ops data.
+        <p>Failed to load ops data.</p>
+        {detail && <p className="text-sm mt-2 text-red-400/80">{detail}</p>}
+        <p className="text-sm mt-2 text-slate-400">
+          Confirm the backend is running on :8001 and try reseeding with{" "}
+          <code className="text-slate-300">./scripts/demo-prep.sh</code>.
+        </p>
       </div>
     );
   }
@@ -87,12 +97,10 @@ export default function Ops() {
             onChange={(e) => setOpsDate(e.target.value)}
             className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm"
           />
-          <a
-            href={atoPdfUrl(opsDate)}
-            className="px-3 py-1.5 text-sm rounded border border-slate-700 hover:bg-slate-800"
-          >
-            Export ATO PDF
-          </a>
+          <PdfExportButton
+            label="Export ATO PDF"
+            onDownload={() => downloadAtoPdf(opsDate)}
+          />
           {!data.is_published && data.sortie_count > 0 && (
             <button
               onClick={() => publishMut.mutate()}
@@ -214,12 +222,12 @@ function SortieOpsRow({
       <span className="text-xs text-slate-500 hidden lg:inline">
         {sortie.crew.map((c) => c.crew_position).join(" · ")}
       </span>
-      <a
-        href={briefSheetPdfUrl(sortie.id)}
-        className="text-xs text-slate-400 hover:text-slate-200"
-      >
-        Brief PDF
-      </a>
+      <PdfExportButton
+        label="Brief PDF"
+        variant="link"
+        showIcon={false}
+        onDownload={() => downloadBriefSheetPdf(sortie.id)}
+      />
       {next && !sortie.is_complete && (
         <button
           onClick={() => onAdvance(next)}

@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, PencilLine, FileDown } from "lucide-react";
+import { ArrowLeft, PencilLine } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { fetchGradecard, fetchPerson, gradecardPdfUrl, type GradecardLineItemResultOut } from "../lib/api";
+import { fetchGradecard, fetchPerson, downloadGradecardPdf, type GradecardLineItemResultOut } from "../lib/api";
+import PdfExportButton from "../components/PdfExportButton";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
 
@@ -123,12 +124,10 @@ export default function GradecardDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a
-              href={gradecardPdfUrl(gcId)}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
-            >
-              <FileDown size={13} /> Export PDF
-            </a>
+            <PdfExportButton
+              label="Export PDF"
+              onDownload={() => downloadGradecardPdf(gcId)}
+            />
             <Badge variant={STATUS_VARIANT[gc.overall_status] ?? "neutral"}>
               {gc.overall_status.replace(/_/g, " ")}
             </Badge>
