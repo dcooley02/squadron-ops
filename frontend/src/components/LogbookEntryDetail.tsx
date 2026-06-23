@@ -46,6 +46,14 @@ function CrewRow({ fl }: { fl: FlightLogFull }) {
     <div className="flex items-start justify-between py-2 border-b border-slate-800 last:border-0 gap-3">
       <div>
         <span className="text-xs text-slate-500 uppercase tracking-wide mr-2">{pos}</span>
+        {fl.crew_qual_code && (
+          <span
+            className="font-mono text-xs font-semibold text-slate-300 bg-slate-800 border border-slate-700 rounded px-1 py-0.5 mr-2"
+            title="CNAF M-3710.7 qualification code"
+          >
+            {fl.crew_qual_code}
+          </span>
+        )}
         <span className="text-sm font-medium">{fl.person_name}</span>
         {fl.syllabus_event_completed && (
           <span className="ml-2 text-xs text-blue-400">✓ {fl.syllabus_event_completed}</span>

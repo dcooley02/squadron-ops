@@ -1,11 +1,18 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { fetchCurrencyTypes, fetchPersons, type CurrencyTypeOut, type PersonSummary } from "../lib/api";
+import {
+  fetchCurrencyTypes,
+  fetchPersons,
+  fetchAuditLog,
+  type CurrencyTypeOut,
+  type PersonSummary,
+  type AuditLogEntry,
+} from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
 
-type Tab = "currencies" | "people" | "syllabus";
+type Tab = "currencies" | "people" | "syllabus" | "audit";
 
 const AUDIENCE_LABELS: Record<string, string> = {
   ALL_PILOTS: "All Pilots",
@@ -37,7 +44,7 @@ export default function Admin() {
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-slate-800">
-        {(["currencies", "people", "syllabus"] as Tab[]).map((t) => (
+        {(["currencies", "people", "syllabus", "audit"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -48,7 +55,11 @@ export default function Admin() {
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50")
             }
           >
-            {t === "currencies" ? "Currency Catalog" : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === "currencies"
+              ? "Currency Catalog"
+              : t === "audit"
+              ? "Audit Log"
+              : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -57,6 +68,86 @@ export default function Admin() {
       {tab === "people" && <PeopleTab />}
       {tab === "syllabus" && (
         <div className="card text-slate-500 text-sm">Syllabus management not yet implemented.</div>
+      )}
+      {tab === "audit" && <AuditTab />}
+    </div>
+  );
+}
+
+function AuditTab() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["audit-log"],
+    queryFn: () => fetchAuditLog({ limit: 100 }),
+    refetchInterval: 5_000,
+  });
+  if (isLoading) return <Loading message="Loading audit log…" />;
+  const rows = data ?? [];
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h2>Audit Log</h2>
+        <span className="text-xs text-slate-500">
+          {rows.length === 100 ? "Showing last 100" : `${rows.length} entries`} · auto-refresh 5s
+        </span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-sm text-slate-500">No state-changing API calls recorded yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
+                <th className="font-medium py-1.5 pr-3">Time</th>
+                <th className="font-medium py-1.5 pr-3">Method</th>
+                <th className="font-medium py-1.5 pr-3">Path</th>
+                <th className="font-medium py-1.5 pr-3 text-right">Status</th>
+                <th className="font-medium py-1.5 pr-3 text-right">Took</th>
+                <th className="font-medium py-1.5 pr-3">Body</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-t border-slate-800 align-top">
+                  <td className="py-1.5 pr-3 text-xs text-slate-400 font-mono whitespace-nowrap">
+                    {new Date(r.ts).toLocaleString()}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <Badge
+                      variant={
+                        r.method === "DELETE"
+                          ? "danger"
+                          : r.method === "POST"
+                          ? "success"
+                          : "info"
+                      }
+                    >
+                      {r.method}
+                    </Badge>
+                  </td>
+                  <td className="py-1.5 pr-3 font-mono text-xs text-slate-300">
+                    {r.path}
+                    {r.query_string && (
+                      <span className="text-slate-500">?{r.query_string}</span>
+                    )}
+                  </td>
+                  <td
+                    className={`py-1.5 pr-3 text-right font-mono text-xs ${
+                      r.response_status >= 400 ? "text-red-400" : "text-slate-300"
+                    }`}
+                  >
+                    {r.response_status}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right text-xs text-slate-400">
+                    {r.duration_ms != null ? `${r.duration_ms}ms` : "—"}
+                  </td>
+                  <td className="py-1.5 pr-3 font-mono text-[10px] text-slate-500 max-w-md truncate">
+                    {r.request_body ? JSON.stringify(r.request_body) : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

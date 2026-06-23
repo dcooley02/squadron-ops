@@ -56,6 +56,7 @@ class DiscrepancyCreate(BaseModel):
     severity: DiscrepancySeverity
     system_affected: Optional[str] = None
     notes: Optional[str] = None
+    type_wo_code: Optional[str] = None
 
 
 class SafetyReportCreate(BaseModel):
@@ -276,6 +277,7 @@ class LogbookEntry(BaseModel):
     event_code: Optional[str] = None
     flight_mode: str
     crew_position: str
+    crew_qual_code: Optional[str] = None
     departure_location: Optional[str] = None
     arrival_location: Optional[str] = None
     # Hours
