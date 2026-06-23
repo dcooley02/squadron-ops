@@ -24,6 +24,9 @@ import OpsBoard from "./board/OpsBoard";
 import MaintenanceBoard from "./board/MaintenanceBoard";
 import ReadinessBoard from "./board/ReadinessBoard";
 import { ToastProvider } from "./components/Toast";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,9 +40,12 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthProvider>
       <ToastProvider>
       <BrowserRouter>
         <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route element={<ProtectedRoute />}>
           {/* App shell — renders with sidebar nav */}
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
@@ -67,9 +73,11 @@ export default function App() {
           <Route path="/board/ops" element={<OpsBoard />} />
           <Route path="/board/maint" element={<MaintenanceBoard />} />
           <Route path="/board/readiness" element={<ReadinessBoard />} />
+          </Route>
         </Routes>
       </BrowserRouter>
       </ToastProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

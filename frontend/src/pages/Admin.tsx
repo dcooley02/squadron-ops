@@ -97,6 +97,7 @@ function AuditTab() {
             <thead>
               <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
                 <th className="font-medium py-1.5 pr-3">Time</th>
+                <th className="font-medium py-1.5 pr-3">Actor</th>
                 <th className="font-medium py-1.5 pr-3">Method</th>
                 <th className="font-medium py-1.5 pr-3">Path</th>
                 <th className="font-medium py-1.5 pr-3 text-right">Status</th>
@@ -109,6 +110,9 @@ function AuditTab() {
                 <tr key={r.id} className="border-t border-slate-800 align-top">
                   <td className="py-1.5 pr-3 text-xs text-slate-400 font-mono whitespace-nowrap">
                     {new Date(r.ts).toLocaleString()}
+                  </td>
+                  <td className="py-1.5 pr-3 text-xs text-slate-300 font-mono">
+                    {r.actor ?? "—"}
                   </td>
                   <td className="py-1.5 pr-3">
                     <Badge

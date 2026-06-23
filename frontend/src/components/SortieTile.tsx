@@ -16,11 +16,15 @@ import {
   fetchSortieFitness,
   removeCrew,
   deleteSortie,
+  suggestCrew,
+  applyCrewSuggestions,
   type SortieSummary,
   type CrewPosition,
 } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import AssignCrewPanel from "./AssignCrewPanel";
 import Badge from "./Badge";
+import { useToast } from "./Toast";
 
 const REQUIRED_POSITIONS: CrewPosition[] = ["HAC", "CREW_CHIEF"];
 const OPTIONAL_POSITIONS: CrewPosition[] = ["H2P", "H2P_U", "AIRCREW", "AWS"];
@@ -54,11 +58,15 @@ interface Props {
 
 export default function SortieTile({ sortieId, sortieSummary: summary, onDeleted }: Props) {
   const qc = useQueryClient();
+  const { hasRole } = useAuth();
+  const { showToast } = useToast();
+  const canManageSchedule = hasRole("sdo", "co_xo");
   const [assignPanel, setAssignPanel] = useState<CrewPosition | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [removing, setRemoving] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
 
   const { data: detail } = useQuery({
     queryKey: ["sortie-detail", sortieId],
@@ -94,6 +102,35 @@ export default function SortieTile({ sortieId, sortieSummary: summary, onDeleted
       qc.invalidateQueries({ queryKey: ["sortie-fitness", sortieId] });
     } finally {
       setRemoving(null);
+    }
+  }
+
+  async function handleSuggestCrew() {
+    setSuggesting(true);
+    try {
+      const result = await suggestCrew(sortieId);
+      const picks = result.slots
+        .filter((s) => s.recommended_person_id != null)
+        .map((s) => ({
+          person_id: s.recommended_person_id!,
+          crew_position: s.crew_position,
+        }));
+      if (picks.length === 0) {
+        showToast("No open slots or eligible crew found", "error");
+        return;
+      }
+      const applied = await applyCrewSuggestions(sortieId, picks);
+      qc.invalidateQueries({ queryKey: ["sortie-detail", sortieId] });
+      qc.invalidateQueries({ queryKey: ["sortie-fitness", sortieId] });
+      const msg =
+        applied.skipped.length > 0
+          ? `Assigned ${applied.assigned.length} · skipped ${applied.skipped.length}`
+          : `Assigned ${applied.assigned.length} crew from rankings`;
+      showToast(msg, applied.skipped.length ? "error" : "success");
+    } catch {
+      showToast("Could not apply crew suggestions", "error");
+    } finally {
+      setSuggesting(false);
     }
   }
 
@@ -145,6 +182,18 @@ export default function SortieTile({ sortieId, sortieSummary: summary, onDeleted
           <MoreHorizontal size={16} />
         </button>
       </div>
+
+      {canManageSchedule && (
+        <div className="mb-3">
+          <button
+            onClick={handleSuggestCrew}
+            disabled={suggesting}
+            className="text-xs px-2.5 py-1 rounded border border-slate-700 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          >
+            {suggesting ? "Ranking crew…" : "Suggest crew"}
+          </button>
+        </div>
+      )}
 
       {/* Crew slots */}
       <div className="space-y-1.5 mb-3">

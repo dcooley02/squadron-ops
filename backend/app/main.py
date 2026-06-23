@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import persons, aircraft, sorties, dashboard, scheduling, logging as flight_logging, syllabus, currency, maintenance, tmr_codes, audit, readiness, boards, ops
+from app.api import persons, aircraft, sorties, dashboard, scheduling, logging as flight_logging, syllabus, currency, maintenance, tmr_codes, audit, readiness, boards, ops, auth
 from app.middleware.audit import AuditLogMiddleware
+from app.middleware.auth import AuthMiddleware
 
 app = FastAPI(title="HSC Squadron Ops")
 
@@ -13,8 +14,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(AuditLogMiddleware)
+app.add_middleware(AuthMiddleware)
 
 # Routers
+app.include_router(auth.router)
 app.include_router(persons.router)
 app.include_router(aircraft.router)
 app.include_router(sorties.router)

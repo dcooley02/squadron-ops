@@ -3,14 +3,22 @@ from sqlalchemy.orm import Session, joinedload
 from datetime import date, datetime, timedelta, time as dt_time
 from typing import List
 
+from app.core.deps import get_current_user, require_roles
 from app.database import get_db
-from app.models.models import Sortie, FlightLog, CrewPosition
+from app.models.models import Person, Sortie, FlightLog, CrewPosition, Role
 from app.schemas.sorties import SortieSummary, FlightLogOut
 from app.schemas.scheduling import (
     EligibleCrewmember, SortieFitness,
     SortieCreate, FlightLogCreate,
+    SuggestCrewResponse, ApplyCrewSuggestion, ApplySuggestionsResponse,
+    ProposeWeekRequest, ProposeWeekResponse,
 )
-from app.services.scheduling import get_eligible_crew, compute_fitness
+from app.services.scheduling import (
+    get_eligible_crew,
+    compute_fitness,
+    suggest_crew_for_sortie,
+    propose_week,
+)
 
 router = APIRouter(prefix="/api/scheduling", tags=["scheduling"])
 
@@ -89,8 +97,84 @@ def sortie_fitness(sortie_id: int, db: Session = Depends(get_db)):
     return result
 
 
+@router.post("/sorties/{sortie_id}/suggest-crew", response_model=SuggestCrewResponse)
+def suggest_crew(sortie_id: int, db: Session = Depends(get_db), _: Person = Depends(get_current_user)):
+    sortie = (
+        db.query(Sortie)
+        .options(joinedload(Sortie.flight_logs))
+        .filter(Sortie.id == sortie_id)
+        .first()
+    )
+    if not sortie:
+        raise HTTPException(status_code=404, detail=f"Sortie {sortie_id} not found")
+    return suggest_crew_for_sortie(db, sortie)
+
+
+@router.post("/sorties/{sortie_id}/apply-suggestions", response_model=ApplySuggestionsResponse)
+def apply_suggestions(
+    sortie_id: int,
+    payload: List[ApplyCrewSuggestion],
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
+):
+    sortie = db.query(Sortie).filter(Sortie.id == sortie_id).first()
+    if not sortie:
+        raise HTTPException(status_code=404, detail=f"Sortie {sortie_id} not found")
+
+    assigned: list[FlightLogCreate] = []
+    skipped: list[str] = []
+
+    for item in payload:
+        duplicate = (
+            db.query(FlightLog)
+            .filter(FlightLog.sortie_id == sortie_id, FlightLog.person_id == item.person_id)
+            .first()
+        )
+        if duplicate:
+            skipped.append(f"Person {item.person_id} already assigned")
+            continue
+        pos_taken = (
+            db.query(FlightLog)
+            .filter(FlightLog.sortie_id == sortie_id, FlightLog.crew_position == item.crew_position)
+            .first()
+        )
+        if pos_taken:
+            skipped.append(f"{item.crew_position.value} slot already filled")
+            continue
+        fl = FlightLog(
+            sortie_id=sortie_id,
+            person_id=item.person_id,
+            crew_position=item.crew_position,
+            hours_logged=sortie.duration_hours or 0.0,
+        )
+        db.add(fl)
+        assigned.append(FlightLogCreate(
+            person_id=item.person_id,
+            crew_position=item.crew_position,
+            hours_logged=sortie.duration_hours,
+        ))
+
+    db.commit()
+    return ApplySuggestionsResponse(assigned=assigned, skipped=skipped)
+
+
+@router.post("/propose-week", response_model=ProposeWeekResponse)
+def propose_week_schedule(
+    body: ProposeWeekRequest,
+    db: Session = Depends(get_db),
+    _: Person = Depends(get_current_user),
+):
+    if not body.missions:
+        raise HTTPException(status_code=400, detail="At least one mission stub is required")
+    return propose_week(db, body.missions)
+
+
 @router.post("/sorties", response_model=SortieSummary, status_code=201)
-def create_sortie(payload: SortieCreate, db: Session = Depends(get_db)):
+def create_sortie(
+    payload: SortieCreate,
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
+):
     """Create a new planned sortie (is_complete=False)."""
     sortie = Sortie(
         event_type=payload.event_type,
@@ -119,7 +203,12 @@ def create_sortie(payload: SortieCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/sorties/{sortie_id}/crew", response_model=FlightLogOut, status_code=201)
-def add_crew(sortie_id: int, payload: FlightLogCreate, db: Session = Depends(get_db)):
+def add_crew(
+    sortie_id: int,
+    payload: FlightLogCreate,
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
+):
     """Assign a person to a planned sortie."""
     sortie = db.query(Sortie).filter(Sortie.id == sortie_id).first()
     if not sortie:
@@ -160,7 +249,12 @@ def add_crew(sortie_id: int, payload: FlightLogCreate, db: Session = Depends(get
 
 
 @router.delete("/sorties/{sortie_id}/crew/{flight_log_id}", status_code=204)
-def remove_crew(sortie_id: int, flight_log_id: int, db: Session = Depends(get_db)):
+def remove_crew(
+    sortie_id: int,
+    flight_log_id: int,
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
+):
     """Remove a crewmember assignment from a sortie."""
     fl = (
         db.query(FlightLog)
@@ -178,7 +272,11 @@ def remove_crew(sortie_id: int, flight_log_id: int, db: Session = Depends(get_db
 
 
 @router.delete("/sorties/{sortie_id}", status_code=204)
-def delete_sortie(sortie_id: int, db: Session = Depends(get_db)):
+def delete_sortie(
+    sortie_id: int,
+    db: Session = Depends(get_db),
+    _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
+):
     """Delete a planned sortie. Refused for completed (historical) sorties."""
     sortie = db.query(Sortie).filter(Sortie.id == sortie_id).first()
     if not sortie:
