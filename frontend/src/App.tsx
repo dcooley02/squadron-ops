@@ -15,6 +15,7 @@ import GradecardFill from "./pages/GradecardFill";
 import Admin from "./pages/Admin";
 import Maintenance from "./pages/Maintenance";
 import Readiness from "./pages/Readiness";
+import Ops from "./pages/Ops";
 import AircraftMaintenance from "./pages/AircraftMaintenance";
 import CompleteSortie from "./pages/CompleteSortie";
 import Logbook from "./pages/Logbook";
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/sorties/:id/complete" element={<CompleteSortie />} />
             <Route path="/logbook/:personId" element={<Logbook />} />
             <Route path="/schedule" element={<Schedule />} />
+            <Route path="/ops" element={<Ops />} />
             <Route path="/training" element={<Training />} />
             <Route path="/training/gradecard/:id" element={<GradecardDetail />} />
             <Route path="/training/gradecard/:id/fill" element={<GradecardFill />} />

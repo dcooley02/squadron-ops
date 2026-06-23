@@ -25,6 +25,8 @@ def _summary(s: Sortie) -> SortieSummary:
         "land_time": s.land_time,
         "duration_hours": s.duration_hours,
         "is_complete": s.is_complete,
+        "ops_status": s.ops_status,
+        "mission_summary": s.mission_summary,
     })
 
 
@@ -165,8 +167,12 @@ def get_sortie(sortie_id: int, db: Session = Depends(get_db)):
         "land_time": s.land_time,
         "duration_hours": s.duration_hours,
         "is_complete": s.is_complete,
+        "ops_status": s.ops_status,
+        "mission_summary": s.mission_summary,
         "debrief_notes": s.debrief_notes,
         "notes": s.notes,
+        "comm_plan": s.comm_plan,
+        "brief_sheet_notes": s.brief_sheet_notes,
         "flight_mode": s.flight_mode,
         "rounds_fired_20mm": s.rounds_fired_20mm,
         "ugr_fired": s.ugr_fired,

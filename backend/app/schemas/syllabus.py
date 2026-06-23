@@ -129,6 +129,17 @@ class GradecardOut(BaseModel):
     updated_at: datetime
 
 
+class SyllabusProgressEntry(BaseModel):
+    syllabus_event_id: int
+    event_code: Optional[str] = None
+    name: str
+    track: Optional[SyllabusTrack] = None
+    level: Optional[SyllabusLevel] = None
+    status: str
+    gradecard_id: Optional[int] = None
+    is_stan_eval: bool = False
+
+
 class GradecardSummary(BaseModel):
     """Trimmed gradecard for list views."""
     model_config = ConfigDict(from_attributes=True)

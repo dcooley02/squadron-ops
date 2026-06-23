@@ -58,6 +58,37 @@ class FlightMode(str, enum.Enum):
     SIM_TOFT = "SIM_TOFT"
 
 
+class SortieOpsStatus(str, enum.Enum):
+    PLANNED = "PLANNED"
+    PUBLISHED = "PUBLISHED"
+    BRIEFED = "BRIEFED"
+    MANNED = "MANNED"
+    AIRBORNE = "AIRBORNE"
+    RECOVERED = "RECOVERED"
+    DEBRIEFED = "DEBRIEFED"
+
+
+class BoardType(str, enum.Enum):
+    HAC_BOARD = "HAC_BOARD"
+    INSTRUCTOR_BOARD = "INSTRUCTOR_BOARD"
+    NATOPS_CHECK = "NATOPS_CHECK"
+    STAN_EVAL = "STAN_EVAL"
+
+
+class BoardStatus(str, enum.Enum):
+    SCHEDULED = "SCHEDULED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+
+
+class WatchbillRole(str, enum.Enum):
+    SDO = "SDO"
+    ODO = "ODO"
+    DUTY_PILOT = "DUTY_PILOT"
+    DUTY_AIRCREW = "DUTY_AIRCREW"
+    ALERT = "ALERT"
+
+
 class CapabilityArea(str, enum.Enum):
     MOB = "MOB"    # Mobility
     FSO = "FSO"    # Fleet Support Operations
@@ -395,7 +426,19 @@ class Sortie(Base):
     departure_location = Column(String(16), nullable=True)   # ICAO code or hull number
     arrival_location   = Column(String(16), nullable=True)
 
+    # SDO / day-of-ops (Phase 5)
+    ops_status = Column(
+        SQLEnum(SortieOpsStatus), default=SortieOpsStatus.PLANNED, nullable=False
+    )
+    mission_summary = Column(Text, nullable=True)
+    comm_plan = Column(Text, nullable=True)
+    brief_sheet_notes = Column(Text, nullable=True)
+    schedule_publication_id = Column(
+        Integer, ForeignKey("schedule_publications.id"), nullable=True, index=True
+    )
+
     aircraft = relationship("Aircraft", back_populates="sorties")
+    schedule_publication = relationship("SchedulePublication", back_populates="sorties")
     flight_logs = relationship("FlightLog", back_populates="sortie", cascade="all, delete-orphan")
     task_credits = relationship("SortieTaskCredit", back_populates="sortie", cascade="all, delete-orphan")
     safety_reports = relationship("SafetyReport", back_populates="sortie")
@@ -693,6 +736,65 @@ class SortieTmrCode(Base):
 
     sortie = relationship("Sortie", back_populates="sortie_tmr_codes")
     tmr_code = relationship("TmrCode")
+
+
+# ---------- Training boards (Phase 4) ----------
+
+class BoardSchedule(Base):
+    """Scheduled training board or check ride."""
+    __tablename__ = "board_schedules"
+
+    id = Column(Integer, primary_key=True)
+    board_type = Column(SQLEnum(BoardType), nullable=False)
+    scheduled_at = Column(DateTime, nullable=False, index=True)
+    examinee_person_id = Column(Integer, ForeignKey("persons.id"), nullable=False, index=True)
+    instructor_person_id = Column(Integer, ForeignKey("persons.id"), nullable=True, index=True)
+    syllabus_event_id = Column(Integer, ForeignKey("syllabus_events.id"), nullable=True, index=True)
+    gradecard_id = Column(Integer, ForeignKey("gradecards.id"), nullable=True, index=True)
+    sortie_id = Column(Integer, ForeignKey("sorties.id"), nullable=True, index=True)
+    status = Column(SQLEnum(BoardStatus), default=BoardStatus.SCHEDULED, nullable=False)
+    location = Column(String(64), nullable=True)
+    remarks = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    examinee = relationship("Person", foreign_keys=[examinee_person_id])
+    instructor = relationship("Person", foreign_keys=[instructor_person_id])
+    syllabus_event = relationship("SyllabusEvent")
+    gradecard = relationship("Gradecard")
+    sortie = relationship("Sortie")
+
+
+# ---------- SDO schedule publishing (Phase 5) ----------
+
+class SchedulePublication(Base):
+    """Locked flight schedule for a given ops day."""
+    __tablename__ = "schedule_publications"
+
+    id = Column(Integer, primary_key=True)
+    schedule_date = Column(Date, unique=True, nullable=False, index=True)
+    published_at = Column(DateTime, nullable=False)
+    published_by_person_id = Column(Integer, ForeignKey("persons.id"), nullable=True)
+    remarks = Column(Text, nullable=True)
+
+    published_by = relationship("Person")
+    sorties = relationship("Sortie", back_populates="schedule_publication")
+
+
+class WatchbillEntry(Base):
+    """Duty roster assignment for a given day."""
+    __tablename__ = "watchbill_entries"
+    __table_args__ = (
+        UniqueConstraint("duty_date", "role", name="uq_watchbill_date_role"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    duty_date = Column(Date, nullable=False, index=True)
+    role = Column(SQLEnum(WatchbillRole), nullable=False)
+    person_id = Column(Integer, ForeignKey("persons.id"), nullable=False, index=True)
+    shift_label = Column(String(32), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    person = relationship("Person")
 
 
 # ---------- Audit log ----------

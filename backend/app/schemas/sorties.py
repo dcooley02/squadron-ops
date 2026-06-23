@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import Optional, List
-from app.models.models import CrewPosition, FlightMode, TaskGrade, DataProvenance
+from app.models.models import CrewPosition, FlightMode, SortieOpsStatus, TaskGrade, DataProvenance
 from app.schemas.logging import SortieTmrOut
 
 
@@ -93,11 +93,15 @@ class SortieSummary(BaseModel):
     land_time: Optional[datetime] = None
     duration_hours: Optional[float] = None
     is_complete: bool
+    ops_status: SortieOpsStatus = SortieOpsStatus.PLANNED
+    mission_summary: Optional[str] = None
 
 
 class SortieDetail(SortieSummary):
     debrief_notes: Optional[str] = None
     notes: Optional[str] = None
+    comm_plan: Optional[str] = None
+    brief_sheet_notes: Optional[str] = None
     flight_mode: FlightMode = FlightMode.LIVE
     # Activity quantities (null means not recorded / treat as 0)
     rounds_fired_20mm: Optional[int] = None

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
@@ -12,9 +12,12 @@ from app.schemas.syllabus import (
     SyllabusEventOut, SyllabusEventTemplate,
     GradecardCreate, GradecardCreateBlank, GradecardOut, GradecardSummary,
     GradecardLineItemResultOut, GradecardLineItemResultPatch, GradecardPatch,
+    SyllabusProgressEntry,
 )
 from app.schemas.persons import PersonSummary
 from app.services.gradecards import compute_overall_status, credit_syllabus_for_gradecard
+from app.services.gradecard_pdf import render_gradecard_pdf
+from app.services.syllabus_progress import build_syllabus_progress
 
 router = APIRouter(prefix="/api/syllabus", tags=["syllabus"])
 
@@ -317,6 +320,30 @@ def update_gradecard(
 
     db.commit()
     return _load_gradecard(db, gradecard_id)
+
+
+@router.get("/persons/{person_id}/progress", response_model=List[SyllabusProgressEntry])
+def get_person_syllabus_progress(person_id: int, db: Session = Depends(get_db)):
+    """Syllabus progression per event for a crewmember's track."""
+    if not db.query(Person).filter(Person.id == person_id).first():
+        raise HTTPException(status_code=404, detail=f"Person {person_id} not found")
+    return build_syllabus_progress(db, person_id)
+
+
+@router.get("/gradecards/{gradecard_id}/pdf")
+def get_gradecard_pdf(gradecard_id: int, db: Session = Depends(get_db)):
+    """Export a signed-style gradecard PDF (SHARP-recognizable layout)."""
+    try:
+        pdf = render_gradecard_pdf(db, gradecard_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="gradecard_{gradecard_id}.pdf"'},
+    )
 
 
 @router.get("/persons/{person_id}/gradecards", response_model=List[GradecardSummary])

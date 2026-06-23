@@ -1,7 +1,7 @@
 ================================================================================
 SQUADRON OPS v2 — PROJECT SUMMARY
 ================================================================================
-Last updated: June 2026 (post Phase 2/3 — tag v2.0-demo-rc2)
+Last updated: June 2026 (post Phase 4/5 — tag v2.0-demo-rc3)
 Repository: squadron-ops (forked from hsc-squadron-ops v1.0-demo)
 Community focus: HSC / MH-60S (single-squadron demo; multi-squadron deferred)
 Demo docs: DEMO_SCRIPT.txt (10-min walkthrough), DEMO_CHEATSHEET.txt (quick ref)
@@ -289,6 +289,8 @@ App shell (sidebar navigation, localhost:5174)
   /logbook/:personId         Digital logbook with PDF export
   /readiness                 WTM capability readiness — squadron T-ratings,
                                per-area drill-down, pilot matrix
+  /ops                       SDO day-of-ops — publish schedule, watchbill,
+                               sortie status strip, ATO/brief sheet PDF export
   /schedule                  Schedule builder — create sorties, assign crew,
                                eligibility/fitness hints
   /training                  Training hub — syllabus, gradecards
@@ -340,7 +342,9 @@ Maintenance (Phase A + C — demo-ready slice)
 
 Training
   - SWTP syllabus event catalog (realistic HSC codes)
-  - Gradecard create, fill, view
+  - Gradecard create, fill, view, PDF export (SHARP-recognizable layout)
+  - Syllabus progress per crewmember (NOT_STARTED / IN_PROGRESS / COMPLETE)
+  - Training board scheduling (HAC, NATOPS, Stan/Eval) with ranked instructor pairing
   - CBR task option library (scaffolding — full Appendix D not yet seeded)
 
 Readiness
@@ -416,9 +420,11 @@ Not implemented (committed future work per ROADMAP.md):
   #3 Maintenance deep-dive — Full CNAF M-4790.2 chain (complete MAF/WO model,
       work center routing, BCM, ASR/MSR logbook, release projections)
 
-  #4 Training — Board scheduling, instructor pairing, SHARP-style gradesheet PDF
+  #4 Training — Simplified boards + instructor pairing + gradecard PDF shipped;
+      full SHARP parity and board automation still open
 
-  #5 SDO tools — Schedule publishing, ATO, watchbill, day-of ops view
+  #5 SDO tools — Publish schedule, watchbill, day-of ops, ATO/brief PDFs shipped;
+      freq management and multi-day ATO workflow still open
 
   #6 Auth and polish — JWT, RBAC by role, password reset, empty-state pass
 
@@ -484,7 +490,7 @@ Legacy currency codes (avoid in new logic): NVG, NIGHT_DL — use NIGHT_NVD from
 18. DEMO READINESS ASSESSMENT (JUNE 2026)
 ================================================================================
 
-Status: demo-ready at tag v2.0-demo-rc2 (Phase 2/3 complete).
+Status: demo-ready at tag v2.0-demo-rc3 (Phase 4/5 complete).
 
 External browser review rated the platform credible for a 10-minute walkthrough.
 Core cascade (sortie completion → currency → maintenance status) works without
@@ -507,7 +513,13 @@ Phase 2/3 shipped:
   - SIM_TOFT gates CBR task credits on sim_eligible (currencies already gated)
   - WTM readiness API + /readiness UI + dashboard/board integration
 
-Next phase: full Appendix D seed, readiness PDF export, maintenance deep-dive (#3).
+Phase 4/5 shipped:
+  - Training boards API + instructor pairing + Boards tab on /training
+  - Syllabus progress on crew detail; gradecard PDF export
+  - SDO /ops console: schedule publish, watchbill, sortie ops status, ATO/brief PDFs
+  - Seed: watchbill, sample boards, today's schedule pre-published
+
+Next phase: maintenance deep-dive (#3), auth/RBAC (#6).
 
 ================================================================================
 END OF DOCUMENT

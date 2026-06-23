@@ -29,6 +29,8 @@ def _sortie_summary(s: Sortie) -> SortieSummary:
         "land_time": s.land_time,
         "duration_hours": s.duration_hours,
         "is_complete": s.is_complete,
+        "ops_status": s.ops_status,
+        "mission_summary": s.mission_summary,
     })
 
 

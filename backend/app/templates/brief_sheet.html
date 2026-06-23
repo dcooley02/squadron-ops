@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    @page { size: letter; margin: 0.65in; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 10pt; }
+    h1 { font-size: 14pt; margin-bottom: 4px; }
+    .sub { color: #555; font-size: 9pt; margin-bottom: 12px; }
+    .box { border: 1px solid #333; padding: 10px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+    th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+    th { background: #eee; }
+  </style>
+</head>
+<body>
+  <h1>SORTIE BRIEF SHEET</h1>
+  <div class="sub">MH-60S · Status: {{ ops_status }}</div>
+
+  <div class="box">
+    <div><strong>Event:</strong> {{ event_code }} ({{ event_type }})</div>
+    <div><strong>Aircraft:</strong> {{ aircraft }}</div>
+    <div><strong>Brief / Takeoff:</strong> {{ brief_time }} / {{ takeoff_time }} local</div>
+    <div><strong>Mission:</strong> {{ mission_summary }}</div>
+    <div><strong>Comm:</strong> {{ comm_plan }}</div>
+    {% if brief_notes %}<div><strong>Notes:</strong> {{ brief_notes }}</div>{% endif %}
+  </div>
+
+  <h2 style="font-size:11pt;">Crew</h2>
+  <table>
+    <thead><tr><th>Position</th><th>Name</th></tr></thead>
+    <tbody>
+      {% for c in crew %}
+      <tr><td>{{ c.position }}</td><td>{{ c.name }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

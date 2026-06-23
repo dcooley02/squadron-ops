@@ -1,17 +1,19 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   fetchPersons, fetchSyllabusEvents, fetchPersonGradecards,
+  fetchBoardSchedules, fetchInstructorCandidates, createBoardSchedule,
   type PersonSummary, type GradecardSummary, type SyllabusEventOut,
+  type BoardSchedule, type BoardType, type InstructorCandidate,
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
 import NewGradecardModal from "../components/NewGradecardModal";
 
-type Tab = "people" | "events" | "gradecards";
+type Tab = "people" | "events" | "gradecards" | "boards";
 
 export default function Training() {
   const [tab, setTab] = useState<Tab>("people");
@@ -24,7 +26,7 @@ export default function Training() {
 
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-slate-800 pb-0">
-        {(["people", "events", "gradecards"] as Tab[]).map((t) => (
+        {(["people", "events", "gradecards", "boards"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -35,7 +37,7 @@ export default function Training() {
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50")
             }
           >
-            {t === "gradecards" ? "Gradecards" : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === "gradecards" ? "Gradecards" : t === "boards" ? "Boards" : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -43,6 +45,7 @@ export default function Training() {
       {tab === "people" && <PeopleTab />}
       {tab === "events" && <EventsTab />}
       {tab === "gradecards" && <GradecardsTab />}
+      {tab === "boards" && <BoardsTab />}
     </div>
   );
 }
@@ -312,6 +315,206 @@ function PersonGradecards({ person }: { person: PersonSummary }) {
         {cards.map((gc) => (
           <GradecardRow key={gc.id} gc={gc} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function BoardsTab() {
+  const { data: boards, isLoading } = useQuery({
+    queryKey: ["board-schedules"],
+    queryFn: fetchBoardSchedules,
+  });
+
+  if (isLoading) return <Loading />;
+
+  return (
+    <div className="space-y-4">
+      <ScheduleBoardForm />
+      <div className="card">
+        <h2 className="mb-3">Upcoming boards</h2>
+        {(boards ?? []).length === 0 ? (
+          <p className="text-sm text-slate-500">No boards scheduled.</p>
+        ) : (
+          <div className="space-y-2">
+            {(boards ?? []).map((b) => (
+              <BoardRow key={b.id} board={b} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BoardRow({ board }: { board: BoardSchedule }) {
+  return (
+    <div className="flex flex-wrap items-center gap-3 py-2 border-b border-slate-800 last:border-0">
+      <Badge variant="info">{board.board_type.replace(/_/g, " ")}</Badge>
+      <span className="text-sm font-medium">{board.examinee_name}</span>
+      <span className="text-xs text-slate-500">
+        {format(parseISO(board.scheduled_at), "MMM d HH:mm")}
+      </span>
+      {board.event_code && (
+        <span className="font-mono text-xs text-blue-400">{board.event_code}</span>
+      )}
+      <span className="text-sm text-slate-400">
+        IP: {board.instructor_name ?? "TBD"}
+      </span>
+      {board.location && <span className="text-xs text-slate-500">{board.location}</span>}
+    </div>
+  );
+}
+
+function ScheduleBoardForm() {
+  const [open, setOpen] = useState(false);
+  const [boardType, setBoardType] = useState<BoardType>("HAC_BOARD");
+  const [examineeId, setExamineeId] = useState<number | "">("");
+  const [eventId, setEventId] = useState<number | "">("");
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [candidates, setCandidates] = useState<InstructorCandidate[]>([]);
+  const [instructorId, setInstructorId] = useState<number | "">("");
+  const queryClient = useQueryClient();
+
+  const { data: persons } = useQuery({
+    queryKey: ["persons"],
+    queryFn: () => fetchPersons(),
+  });
+  const { data: events } = useQuery({
+    queryKey: ["syllabus-events-stan"],
+    queryFn: () => fetchSyllabusEvents({ is_stan_eval: true }),
+  });
+
+  const createMut = useMutation({
+    mutationFn: createBoardSchedule,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["board-schedules"] });
+      setOpen(false);
+    },
+  });
+
+  async function loadCandidates() {
+    if (!examineeId || !scheduledAt) return;
+    const list = await fetchInstructorCandidates({
+      board_type: boardType,
+      examinee_person_id: Number(examineeId),
+      scheduled_at: new Date(scheduledAt).toISOString(),
+      syllabus_event_id: eventId ? Number(eventId) : undefined,
+    });
+    setCandidates(list);
+    if (list[0]) setInstructorId(list[0].person_id);
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white font-medium"
+      >
+        <Plus size={14} /> Schedule board
+      </button>
+    );
+  }
+
+  const pilots = (persons ?? []).filter((p) => p.role === "pilot" || p.role === "co_xo");
+
+  return (
+    <div className="card space-y-3">
+      <h2>Schedule training board</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <label className="space-y-1">
+          <span className="text-slate-500">Board type</span>
+          <select
+            value={boardType}
+            onChange={(e) => setBoardType(e.target.value as BoardType)}
+            className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5"
+          >
+            <option value="HAC_BOARD">HAC Board</option>
+            <option value="INSTRUCTOR_BOARD">Instructor Board</option>
+            <option value="NATOPS_CHECK">NATOPS Check</option>
+            <option value="STAN_EVAL">Stan/Eval</option>
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-500">Examinee</span>
+          <select
+            value={examineeId}
+            onChange={(e) => setExamineeId(e.target.value ? Number(e.target.value) : "")}
+            className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5"
+          >
+            <option value="">Select pilot…</option>
+            {pilots.map((p) => (
+              <option key={p.id} value={p.id}>{p.last_name}, {p.first_name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-500">Syllabus event (optional)</span>
+          <select
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value ? Number(e.target.value) : "")}
+            className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5"
+          >
+            <option value="">—</option>
+            {(events ?? []).map((ev) => (
+              <option key={ev.id} value={ev.id}>{ev.event_code} — {ev.name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <span className="text-slate-500">Date & time</span>
+          <input
+            type="datetime-local"
+            value={scheduledAt}
+            onChange={(e) => setScheduledAt(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5"
+          />
+        </label>
+      </div>
+      <button
+        type="button"
+        onClick={loadCandidates}
+        className="text-sm text-blue-400 hover:text-blue-300"
+      >
+        Suggest instructors →
+      </button>
+      {candidates.length > 0 && (
+        <div className="space-y-1">
+          <span className="text-xs text-slate-500 uppercase">Ranked instructors</span>
+          {candidates.slice(0, 5).map((c) => (
+            <label key={c.person_id} className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="radio"
+                name="instructor"
+                checked={instructorId === c.person_id}
+                onChange={() => setInstructorId(c.person_id)}
+              />
+              <span>{c.person_name}</span>
+              <span className="text-xs text-slate-500">score {c.score}</span>
+            </label>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={() =>
+            createMut.mutate({
+              board_type: boardType,
+              scheduled_at: new Date(scheduledAt).toISOString(),
+              examinee_person_id: Number(examineeId),
+              instructor_person_id: instructorId ? Number(instructorId) : undefined,
+              syllabus_event_id: eventId ? Number(eventId) : undefined,
+              location: "Ready room",
+            })
+          }
+          disabled={!examineeId || !scheduledAt || createMut.isPending}
+          className="px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white disabled:opacity-50"
+        >
+          Save board
+        </button>
+        <button onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm text-slate-400">
+          Cancel
+        </button>
       </div>
     </div>
   );

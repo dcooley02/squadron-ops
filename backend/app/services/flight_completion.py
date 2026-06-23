@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.models import (
     Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
     Currency, Aircraft, Discrepancy, SafetyReport,
-    FlightMode, CrewPosition, DiscrepancySeverity, DiscrepancyWorkStatus, Person, CurrencyType,
+    FlightMode, SortieOpsStatus, CrewPosition, DiscrepancySeverity, DiscrepancyWorkStatus, Person, CurrencyType,
     SortieLeg, InstrumentApproach, TmrCode, SortieTmrCode, DataProvenance,
 )
 from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
@@ -122,6 +122,7 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     if payload.flight_mode is not None:
         sortie.flight_mode = payload.flight_mode
     sortie.is_complete = True
+    sortie.ops_status = SortieOpsStatus.DEBRIEFED
 
     flight_mode = sortie.flight_mode
     flight_date = payload.actual_takeoff_time.date()

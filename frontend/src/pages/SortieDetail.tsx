@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 import {
   fetchSortie,
   fetchSafetyReportsForSortie,
+  briefSheetPdfUrl,
   type CrewPosition,
   type SortieDetail as SortieDetailType,
   type FlightLogOut,
@@ -115,7 +116,16 @@ export default function SortieDetail() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {data.ops_status && (
+              <Badge variant="neutral">{data.ops_status}</Badge>
+            )}
+            <a
+              href={briefSheetPdfUrl(sortieId)}
+              className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800 text-slate-400"
+            >
+              Brief sheet PDF
+            </a>
             <Badge variant={data.is_complete ? "success" : "info"}>
               {data.is_complete ? "Complete" : "Scheduled"}
             </Badge>
@@ -129,6 +139,16 @@ export default function SortieDetail() {
             )}
           </div>
         </div>
+        {(data.mission_summary || data.comm_plan) && (
+          <div className="mt-3 pt-3 border-t border-slate-800 text-sm space-y-1">
+            {data.mission_summary && (
+              <p><span className="text-slate-500">Mission:</span> {data.mission_summary}</p>
+            )}
+            {data.comm_plan && (
+              <p><span className="text-slate-500">Comm:</span> {data.comm_plan}</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Hour breakdown */}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
+import { Link } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { fetchUpcomingSorties, fetchSortieFitness, type SortieSummary } from "../lib/api";
 import SortieTile from "../components/SortieTile";
@@ -63,13 +64,21 @@ export default function Schedule() {
           <h1>Schedule</h1>
           <p className="text-sm text-slate-400 mt-1">Upcoming sorties — next 7 days</p>
         </div>
-        <button
-          onClick={() => setShowNewFlight(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white"
-        >
-          <Plus size={14} />
-          New Flight
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/ops"
+            className="px-3 py-1.5 text-sm rounded border border-slate-700 hover:bg-slate-800 text-slate-300"
+          >
+            Ops console →
+          </Link>
+          <button
+            onClick={() => setShowNewFlight(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-700 hover:bg-blue-600 text-white"
+          >
+            <Plus size={14} />
+            New Flight
+          </button>
+        </div>
       </div>
 
       {isLoading && <Loading message="Loading schedule…" />}
