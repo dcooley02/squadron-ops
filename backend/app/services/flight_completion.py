@@ -123,6 +123,7 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
         sortie.flight_mode = payload.flight_mode
     sortie.is_complete = True
 
+    flight_mode = sortie.flight_mode
     flight_date = payload.actual_takeoff_time.date()
 
     # Create SortieLeg rows when routing was multi-stop
@@ -200,19 +201,23 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     # Build person_id → flight_log map for task-credit insertion
     log_by_person: dict[int, FlightLog] = {fl.person_id: fl for fl in sortie.flight_logs}
 
-    # Validate task codes against the library (warn but allow ad-hoc codes)
-    known_codes: set[str] = {
-        row.code for row in db.query(CbrTaskOption.code).all()
+    task_options: dict[str, CbrTaskOption] = {
+        row.code: row for row in db.query(CbrTaskOption).all()
     }
 
     # ── Step 5: insert SortieTaskCredit rows ────────────────────────────────────
     for credit_spec in payload.task_credits:
+        task_opt = task_options.get(credit_spec.task_code)
+        if (
+            flight_mode == FlightMode.SIM_TOFT
+            and task_opt is not None
+            and not task_opt.sim_eligible
+        ):
+            continue
         for person_id in credit_spec.person_ids:
             fl = log_by_person.get(person_id)
             if fl is None:
                 continue  # person not on this sortie — skip silently
-            if credit_spec.task_code not in known_codes:
-                pass  # ad-hoc code; accepted without FK enforcement
             # Honour uniqueness: skip if already credited (idempotent re-submit)
             existing = db.query(SortieTaskCredit).filter(
                 SortieTaskCredit.flight_log_id == fl.id,
@@ -240,7 +245,6 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
         )
 
     # ── Step 6: refresh currencies (Wing Table B-2, activity-quantity gated) ────
-    flight_mode = sortie.flight_mode
     for fl in sortie.flight_logs:
         person = fl.person
         if person is None:

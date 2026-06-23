@@ -4,11 +4,14 @@ import { ArrowLeft, BookOpen } from "lucide-react";
 import {
   fetchPerson,
   fetchPersonTrainingJacket,
+  fetchPersonReadiness,
   type CurrencyOut,
+  type PersonAreaRating,
   type TrainingJacketEntry,
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
+import TRatingBadge from "../components/TRatingBadge";
 import { classifyExpiration, daysUntil, formatDate } from "../lib/dates";
 
 export default function CrewDetail() {
@@ -25,6 +28,12 @@ export default function CrewDetail() {
     queryKey: ["training-jacket", personId],
     queryFn: () => fetchPersonTrainingJacket(personId),
     enabled: !isNaN(personId),
+  });
+
+  const { data: readiness } = useQuery({
+    queryKey: ["person-readiness", personId],
+    queryFn: () => fetchPersonReadiness(personId),
+    enabled: !isNaN(personId) && data?.role === "pilot",
   });
 
   if (isLoading) return <Loading />;
@@ -76,6 +85,10 @@ export default function CrewDetail() {
           </div>
         </div>
       </div>
+
+      {readiness && (
+        <ReadinessCard readiness={readiness} />
+      )}
 
       {/* Two columns: quals and currencies */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -134,6 +147,50 @@ export default function CrewDetail() {
 
       {/* Training Jacket */}
       <TrainingJacketCard entries={trainingJacket} personId={personId} />
+    </div>
+  );
+}
+
+function ReadinessCard({
+  readiness,
+}: {
+  readiness: {
+    overall_rating: string;
+    areas: PersonAreaRating[];
+  };
+}) {
+  const degraded = readiness.areas.filter((a) => a.rating !== "T-1");
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h2>WTM Capability Readiness</h2>
+        <TRatingBadge rating={readiness.overall_rating} />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        {readiness.areas.map((area) => (
+          <div
+            key={area.capability_area}
+            className="rounded border border-slate-800 px-2 py-1.5 flex items-center justify-between gap-2"
+          >
+            <span className="font-mono text-xs text-slate-400">{area.capability_area}</span>
+            <TRatingBadge rating={area.rating} />
+          </div>
+        ))}
+      </div>
+      {degraded.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-slate-500 uppercase tracking-wide">Contributing factors</p>
+          {degraded.map((area) => (
+            <div key={area.capability_area} className="text-sm">
+              <span className="text-slate-300 font-mono">{area.capability_area}</span>
+              <span className="text-slate-500 mx-2">·</span>
+              <span className="text-slate-400 text-xs">
+                {area.contributing_factors.join("; ") || "Below T-1 threshold"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
