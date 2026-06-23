@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard, Users, Plane, Calendar,
-  GraduationCap, Wrench, Tv, Settings, ClipboardList, Shield,
+  GraduationCap, Wrench, Tv, Settings, ClipboardList, Shield, Radio,
 } from "lucide-react";
 import clsx from "clsx";
 
@@ -11,6 +11,7 @@ const navItems = [
   { to: "/aircraft", label: "Aircraft", icon: Plane },
   { to: "/sorties", label: "Sorties", icon: ClipboardList },
   { to: "/schedule", label: "Schedule", icon: Calendar },
+  { to: "/ops", label: "Ops", icon: Radio },
   { to: "/readiness", label: "Readiness", icon: Shield },
   { to: "/training", label: "Training", icon: GraduationCap },
   { to: "/maintenance", label: "Maintenance", icon: Wrench },

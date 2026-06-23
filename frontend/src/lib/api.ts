@@ -172,6 +172,10 @@ export interface SortieTmrCodeOut {
   hours: number | null;
 }
 
+export type SortieOpsStatus =
+  | "PLANNED" | "PUBLISHED" | "BRIEFED" | "MANNED"
+  | "AIRBORNE" | "RECOVERED" | "DEBRIEFED";
+
 export interface SortieSummary {
   id: number;
   event_code: string | null;
@@ -183,6 +187,8 @@ export interface SortieSummary {
   land_time: string | null;
   duration_hours: number | null;
   is_complete: boolean;
+  ops_status?: SortieOpsStatus;
+  mission_summary?: string | null;
 }
 
 export interface SortieTaskCredit {
@@ -201,6 +207,8 @@ export interface SortieDetail extends SortieSummary {
   instrument_hours: number | null;
   debrief_notes: string | null;
   notes: string | null;
+  comm_plan?: string | null;
+  brief_sheet_notes?: string | null;
   flight_mode: string;
   // Activity quantities
   rounds_fired_20mm: number | null;
@@ -828,3 +836,160 @@ export const fetchPersonReadiness = async (
   );
   return data;
 };
+
+// ---------- Training boards (Phase 4) ----------
+
+export type BoardType = "HAC_BOARD" | "INSTRUCTOR_BOARD" | "NATOPS_CHECK" | "STAN_EVAL";
+export type BoardStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
+
+export interface BoardSchedule {
+  id: number;
+  board_type: BoardType;
+  scheduled_at: string;
+  examinee_person_id: number;
+  examinee_name: string;
+  instructor_person_id: number | null;
+  instructor_name: string | null;
+  syllabus_event_id: number | null;
+  event_code: string | null;
+  status: BoardStatus;
+  location: string | null;
+  remarks: string | null;
+}
+
+export interface InstructorCandidate {
+  person_id: number;
+  person_name: string;
+  callsign: string | null;
+  rank: string | null;
+  score: number;
+  factors: string[];
+}
+
+export interface SyllabusProgressEntry {
+  syllabus_event_id: number;
+  event_code: string | null;
+  name: string;
+  track: string | null;
+  level: string | null;
+  status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETE";
+  gradecard_id: number | null;
+  is_stan_eval: boolean;
+}
+
+export const fetchBoardSchedules = async (): Promise<BoardSchedule[]> => {
+  const { data } = await api.get<BoardSchedule[]>("/api/boards");
+  return data;
+};
+
+export const createBoardSchedule = async (
+  payload: {
+    board_type: BoardType;
+    scheduled_at: string;
+    examinee_person_id: number;
+    instructor_person_id?: number;
+    syllabus_event_id?: number;
+    location?: string;
+    remarks?: string;
+  }
+): Promise<BoardSchedule> => {
+  const { data } = await api.post<BoardSchedule>("/api/boards", payload);
+  return data;
+};
+
+export const fetchInstructorCandidates = async (params: {
+  board_type: BoardType;
+  examinee_person_id: number;
+  scheduled_at: string;
+  syllabus_event_id?: number;
+}): Promise<InstructorCandidate[]> => {
+  const { data } = await api.get<InstructorCandidate[]>("/api/boards/instructor-candidates", {
+    params,
+  });
+  return data;
+};
+
+export const fetchSyllabusProgress = async (
+  personId: number
+): Promise<SyllabusProgressEntry[]> => {
+  const { data } = await api.get<SyllabusProgressEntry[]>(
+    `/api/syllabus/persons/${personId}/progress`
+  );
+  return data;
+};
+
+export const gradecardPdfUrl = (gradecardId: number): string =>
+  `${api.defaults.baseURL}/api/syllabus/gradecards/${gradecardId}/pdf`;
+
+// ---------- SDO ops (Phase 5) ----------
+
+export type WatchbillRole = "SDO" | "ODO" | "DUTY_PILOT" | "DUTY_AIRCREW" | "ALERT";
+
+export interface DayOpsSortie {
+  id: number;
+  event_code: string | null;
+  event_type: string | null;
+  aircraft_side_number: string | null;
+  brief_time: string | null;
+  takeoff_time: string | null;
+  land_time: string | null;
+  ops_status: SortieOpsStatus;
+  is_complete: boolean;
+  mission_summary: string | null;
+  comm_plan: string | null;
+  crew: Array<{ person_id: number; person_name: string; crew_position: string }>;
+}
+
+export interface DayOps {
+  ops_date: string;
+  is_published: boolean;
+  publication: {
+    id: number;
+    schedule_date: string;
+    published_at: string;
+    published_by_name: string | null;
+    remarks: string | null;
+  } | null;
+  watchbill: Array<{
+    id: number;
+    role: WatchbillRole;
+    person_id: number;
+    person_name: string;
+    shift_label: string | null;
+    notes: string | null;
+  }>;
+  sorties: DayOpsSortie[];
+  sortie_count: number;
+  airborne_count: number;
+}
+
+export const fetchDayOps = async (opsDate: string): Promise<DayOps> => {
+  const { data } = await api.get<DayOps>(`/api/ops/day/${opsDate}`);
+  return data;
+};
+
+export const publishSchedule = async (
+  opsDate: string,
+  body?: { published_by_person_id?: number; remarks?: string }
+): Promise<DayOps["publication"]> => {
+  const { data } = await api.post(`/api/ops/schedule/${opsDate}/publish`, body ?? {});
+  return data;
+};
+
+export const patchSortieOpsStatus = async (
+  sortieId: number,
+  body: {
+    ops_status: SortieOpsStatus;
+    mission_summary?: string;
+    comm_plan?: string;
+    brief_sheet_notes?: string;
+  }
+): Promise<void> => {
+  await api.patch(`/api/ops/sorties/${sortieId}/status`, body);
+};
+
+export const atoPdfUrl = (opsDate: string): string =>
+  `${api.defaults.baseURL}/api/ops/day/${opsDate}/ato.pdf`;
+
+export const briefSheetPdfUrl = (sortieId: number): string =>
+  `${api.defaults.baseURL}/api/ops/sorties/${sortieId}/brief-sheet.pdf`;

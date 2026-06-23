@@ -15,6 +15,12 @@ See ROADMAP.md for capabilities and ordering.
 - HSC-specific syllabus and currency catalog (will be replaced by
   per-community templates in roadmap item 6)
 
+## Phase 4/5 notes (June 2026)
+- Training boards and instructor pairing use transparent heuristics, not full
+  SHARP scheduling rules
+- SDO ops status is manual advance (no automatic airborne detection)
+- Comms/freq management intentionally out of scope per ROADMAP
+
 ## Phase 2/3 notes (June 2026)
 - WTM T-ratings use simplified anchor-task recency rules in
   `backend/app/services/readiness.py` — not a full CHSCWPINST 3500.1F

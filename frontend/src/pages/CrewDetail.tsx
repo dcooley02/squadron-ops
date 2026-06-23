@@ -5,6 +5,7 @@ import {
   fetchPerson,
   fetchPersonTrainingJacket,
   fetchPersonReadiness,
+  fetchSyllabusProgress,
   type CurrencyOut,
   type PersonAreaRating,
   type TrainingJacketEntry,
@@ -28,6 +29,12 @@ export default function CrewDetail() {
     queryKey: ["training-jacket", personId],
     queryFn: () => fetchPersonTrainingJacket(personId),
     enabled: !isNaN(personId),
+  });
+
+  const { data: syllabusProgress } = useQuery({
+    queryKey: ["syllabus-progress", personId],
+    queryFn: () => fetchSyllabusProgress(personId),
+    enabled: !isNaN(personId) && (data?.role === "pilot" || data?.role === "aircrew"),
   });
 
   const { data: readiness } = useQuery({
@@ -86,8 +93,10 @@ export default function CrewDetail() {
         </div>
       </div>
 
-      {readiness && (
-        <ReadinessCard readiness={readiness} />
+      {readiness && <ReadinessCard readiness={readiness} />}
+
+      {syllabusProgress && syllabusProgress.length > 0 && (
+        <SyllabusProgressCard entries={syllabusProgress} />
       )}
 
       {/* Two columns: quals and currencies */}
@@ -147,6 +156,55 @@ export default function CrewDetail() {
 
       {/* Training Jacket */}
       <TrainingJacketCard entries={trainingJacket} personId={personId} />
+    </div>
+  );
+}
+
+const PROGRESS_VARIANT: Record<string, "success" | "warning" | "neutral"> = {
+  COMPLETE: "success",
+  IN_PROGRESS: "warning",
+  NOT_STARTED: "neutral",
+};
+
+function SyllabusProgressCard({
+  entries,
+}: {
+  entries: Array<{
+    event_code: string | null;
+    name: string;
+    status: string;
+    gradecard_id: number | null;
+    is_stan_eval: boolean;
+  }>;
+}) {
+  const complete = entries.filter((e) => e.status === "COMPLETE").length;
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-3">
+        <h2>Syllabus Progress</h2>
+        <span className="text-xs text-slate-500">
+          {complete}/{entries.length} complete
+        </span>
+      </div>
+      <div className="max-h-48 overflow-y-auto space-y-1">
+        {entries.map((e) => (
+          <div
+            key={e.event_code ?? e.name}
+            className="flex items-center justify-between py-1 border-b border-slate-800/60 text-sm"
+          >
+            <div className="min-w-0">
+              <span className="font-mono text-xs text-blue-400">{e.event_code ?? "—"}</span>
+              <span className="text-slate-400 ml-2 truncate">{e.name}</span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {e.is_stan_eval && <Badge variant="warning" className="text-[10px]">S/E</Badge>}
+              <Badge variant={PROGRESS_VARIANT[e.status] ?? "neutral"} className="text-[10px]">
+                {e.status.replace(/_/g, " ")}
+              </Badge>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

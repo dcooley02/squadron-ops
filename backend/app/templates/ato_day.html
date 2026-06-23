@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    @page { size: letter landscape; margin: 0.5in; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; }
+    h1 { font-size: 13pt; margin: 0; }
+    .meta { font-size: 8pt; color: #444; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    th, td { border: 1px solid #999; padding: 3px 5px; }
+    th { background: #ddd; }
+    .wb { margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  <h1>DAILY AIR TASKING ORDER — {{ ops_date }}</h1>
+  <div class="meta">
+    Sorties: {{ sortie_count }} · Airborne: {{ airborne_count }} ·
+    {% if is_published %}PUBLISHED{% else %}DRAFT — not yet published{% endif %}
+    {% if publication_remarks %} · {{ publication_remarks }}{% endif %}
+  </div>
+
+  <div class="wb">
+    <strong>Watchbill:</strong>
+    {% for w in watchbill %}
+      {{ w.role }}: {{ w.person_name }}{% if not loop.last %} · {% endif %}
+    {% else %}
+      Not assigned
+    {% endfor %}
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Event</th><th>A/C</th><th>TKOF</th><th>Status</th><th>Mission</th><th>Crew</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sorties %}
+      <tr>
+        <td>{{ s.event_code }}</td>
+        <td>{{ s.aircraft }}</td>
+        <td>{{ s.takeoff }}</td>
+        <td>{{ s.status }}</td>
+        <td>{{ s.mission }}</td>
+        <td>{{ s.crew }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">No sorties scheduled</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>
