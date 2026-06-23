@@ -1,8 +1,9 @@
 """
-WTM capability-area T-rating engine (simplified CHSCWPINST 3500.1F Appendix D).
+WTM capability-area T-rating engine (CHSCWPINST 3500.1F Appendix D aligned).
 
-Ratings derive from anchor-task credit recency (Q/CQ grades) plus optional
-Wing Table B-2 currency gates. Compute-on-read — no persisted cache.
+Table-driven: anchor tasks and per-area T-1/T-2 windows load from the database
+(CbrTaskOption.is_anchor_task, CapabilityAreaConfig). Falls back to embedded
+defaults when tables are empty (unit tests).
 """
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -13,9 +14,12 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.models.models import (
     CapabilityArea,
+    CapabilityAreaConfig,
+    CbrTaskOption,
     Currency,
     FlightLog,
     Person,
+    Qualification,
     Role,
     Sortie,
     SortieTaskCredit,
@@ -37,6 +41,7 @@ class AreaRule:
     t1_recency_days: int = 180
     t2_recency_days: int = 365
     currency_codes: Tuple[str, ...] = ()
+    min_qual_codes: Tuple[str, ...] = ()
 
 
 AREA_RULES: Dict[CapabilityArea, AreaRule] = {
@@ -74,6 +79,38 @@ AREA_LABELS: Dict[CapabilityArea, str] = {
 }
 
 
+def _load_area_rule(db: Session, area: CapabilityArea) -> AreaRule:
+    cfg = db.query(CapabilityAreaConfig).filter(
+        CapabilityAreaConfig.capability_area == area
+    ).first()
+    anchors = (
+        db.query(CbrTaskOption.code)
+        .filter(
+            CbrTaskOption.capability_area == area,
+            CbrTaskOption.is_anchor_task.is_(True),
+            CbrTaskOption.is_active.is_(True),
+        )
+        .order_by(CbrTaskOption.code)
+        .all()
+    )
+    anchor_codes = tuple(a[0] for a in anchors)
+    fallback = AREA_RULES[area]
+    return AreaRule(
+        anchor_tasks=anchor_codes or fallback.anchor_tasks,
+        t1_recency_days=cfg.t1_recency_days if cfg else fallback.t1_recency_days,
+        t2_recency_days=cfg.t2_recency_days if cfg else fallback.t2_recency_days,
+        currency_codes=tuple(cfg.currency_codes or []) if cfg else fallback.currency_codes,
+        min_qual_codes=tuple(cfg.min_qual_codes or []) if cfg else fallback.min_qual_codes,
+    )
+
+
+def _area_label(db: Session, area: CapabilityArea) -> str:
+    cfg = db.query(CapabilityAreaConfig).filter(
+        CapabilityAreaConfig.capability_area == area
+    ).first()
+    return cfg.label if cfg else AREA_LABELS[area]
+
+
 def _credit_event_date(credit: SortieTaskCredit, sortie: Sortie) -> date:
     if sortie.land_time:
         return sortie.land_time.date()
@@ -97,12 +134,36 @@ def _load_person_credits(db: Session, person_id: int) -> List[Tuple[SortieTaskCr
     return list(rows)
 
 
+def _qualification_status(
+    db: Session,
+    person_id: int,
+    qual_codes: Tuple[str, ...],
+    today: date,
+) -> Tuple[bool, List[str]]:
+    if not qual_codes:
+        return True, []
+    factors: List[str] = []
+    quals = {
+        q.qual_code: q
+        for q in db.query(Qualification).filter(Qualification.person_id == person_id).all()
+    }
+    ok = True
+    for code in qual_codes:
+        q = quals.get(code)
+        if q is None:
+            ok = False
+            factors.append(f"Missing qualification {code}")
+        elif q.expires_date and q.expires_date < today:
+            ok = False
+            factors.append(f"{code} qualification expired {q.expires_date.isoformat()}")
+    return ok, factors
+
+
 def _currency_status(
     currencies_by_code: Dict[str, Currency],
     codes: Tuple[str, ...],
     today: date,
 ) -> Tuple[bool, bool, List[str]]:
-    """Return (all_current, any_expiring_soon, factor strings)."""
     if not codes:
         return True, False, []
 
@@ -120,7 +181,8 @@ def _currency_status(
             factors.append(f"{code} expired {curr.expires_date.isoformat()}")
         elif curr.expires_date <= today + timedelta(days=14):
             any_expiring = True
-            factors.append(f"{code} expires {curr.expires_date.isoformat()}")
+            days_left = (curr.expires_date - today).days
+            factors.append(f"{code} expires in {days_left}d (T-1 gate)")
     return all_current, any_expiring, factors
 
 
@@ -141,6 +203,16 @@ def _task_recency_days(
     return (today - best).days
 
 
+def _classify_anchor(days: Optional[int], t1: int, t2: int) -> str:
+    if days is None:
+        return "absent"
+    if days <= t1:
+        return "current"
+    if days <= t2:
+        return "stale"
+    return "absent"
+
+
 def rate_person_area(
     person_id: int,
     area: CapabilityArea,
@@ -151,7 +223,7 @@ def rate_person_area(
     currencies_by_code: Optional[Dict[str, Currency]] = None,
 ) -> dict:
     today = today or date.today()
-    rule = AREA_RULES[area]
+    rule = _load_area_rule(db, area)
 
     if credits is None:
         credits = _load_person_credits(db, person_id)
@@ -163,22 +235,17 @@ def rate_person_area(
 
     anchor_status: List[dict] = []
     all_t1 = True
-    any_t2 = False
+    any_in_t2 = False
 
     for task_code in rule.anchor_tasks:
         days = _task_recency_days(credits, task_code, today)
-        if days is None:
-            status = "absent"
+        status = _classify_anchor(days, rule.t1_recency_days, rule.t2_recency_days)
+        if status == "current":
+            any_in_t2 = True
+        elif status == "stale":
             all_t1 = False
-        elif days <= rule.t1_recency_days:
-            status = "current"
-            any_t2 = True
-        elif days <= rule.t2_recency_days:
-            status = "stale"
-            all_t1 = False
-            any_t2 = True
+            any_in_t2 = True
         else:
-            status = "absent"
             all_t1 = False
         anchor_status.append({
             "task_code": task_code,
@@ -186,38 +253,48 @@ def rate_person_area(
             "days_since": days,
         })
 
+    qual_ok, qual_factors = _qualification_status(db, person_id, rule.min_qual_codes, today)
     curr_ok, curr_expiring, curr_factors = _currency_status(
         currencies_by_code, rule.currency_codes, today
     )
 
     factors: List[str] = []
-    if not all_t1:
-        stale = [a["task_code"] for a in anchor_status if a["status"] == "stale"]
-        absent = [a["task_code"] for a in anchor_status if a["status"] == "absent"]
-        if stale:
-            factors.append(f"Stale anchor tasks: {', '.join(stale)}")
-        if absent:
-            factors.append(f"No recent credit: {', '.join(absent)}")
+    for a in anchor_status:
+        if a["status"] == "stale" and a["days_since"] is not None:
+            factors.append(
+                f"{a['task_code']}: last credit {a['days_since']}d ago "
+                f"(T-1 window {rule.t1_recency_days}d) — stale"
+            )
+        elif a["status"] == "absent":
+            if a["days_since"] is None:
+                factors.append(f"{a['task_code']}: no qualifying credit on record")
+            else:
+                factors.append(
+                    f"{a['task_code']}: last credit {a['days_since']}d ago "
+                    f"(beyond T-2 window {rule.t2_recency_days}d)"
+                )
+    factors.extend(qual_factors)
     factors.extend(curr_factors)
 
-    if not any_t2:
+    if not any_in_t2:
+        rating = TRating.T3
+    elif not qual_ok:
         rating = TRating.T3
     elif all_t1 and curr_ok and not curr_expiring:
         rating = TRating.T1
-    elif all_t1 and curr_ok and curr_expiring:
-        rating = TRating.T2
-        factors.append("Linked currency expiring within 14 days")
-    elif all_t1 and not curr_ok:
-        rating = TRating.T2
     else:
         rating = TRating.T2
+        if all_t1 and curr_expiring:
+            factors.append("Linked Table B-2 currency expiring within 14 days — capped at T-2")
 
     return {
         "capability_area": area,
-        "label": AREA_LABELS[area],
+        "label": _area_label(db, area),
         "rating": rating.value,
         "contributing_factors": factors,
         "anchor_tasks": anchor_status,
+        "t1_window_days": rule.t1_recency_days,
+        "t2_window_days": rule.t2_recency_days,
     }
 
 
@@ -231,9 +308,7 @@ def _worst_rating(ratings: List[str]) -> str:
 def build_person_readiness(db: Session, person: Person, today: Optional[date] = None) -> dict:
     today = today or date.today()
     credits = _load_person_credits(db, person.id)
-    currencies_by_code = {
-        c.currency_code: c for c in person.currencies
-    }
+    currencies_by_code = {c.currency_code: c for c in person.currencies}
     areas = [
         rate_person_area(
             person.id,
@@ -256,18 +331,10 @@ def build_person_readiness(db: Session, person: Person, today: Optional[date] = 
     }
 
 
-def build_squadron_readiness(db: Session, today: Optional[date] = None) -> dict:
-    today = today or date.today()
-    pilots = (
-        db.query(Person)
-        .options(joinedload(Person.currencies))
-        .filter(Person.is_active.is_(True), Person.role == Role.PILOT)
-        .order_by(Person.last_name, Person.first_name)
-        .all()
-    )
-
-    person_summaries = [build_person_readiness(db, p, today) for p in pilots]
-
+def _rollup_for_persons(
+    person_summaries: List[dict],
+    today: date,
+) -> Tuple[List[dict], str, int]:
     area_rollups: List[dict] = []
     for area in CapabilityArea:
         counts = {TRating.T1.value: 0, TRating.T2.value: 0, TRating.T3.value: 0}
@@ -278,19 +345,49 @@ def build_squadron_readiness(db: Session, today: Optional[date] = None) -> dict:
             pilot_ratings.append(area_row["rating"])
         area_rollups.append({
             "capability_area": area,
-            "label": AREA_LABELS[area],
+            "label": next(
+                (a["label"] for a in person_summaries[0]["areas"] if a["capability_area"] == area),
+                AREA_LABELS[area],
+            ) if person_summaries else AREA_LABELS[area],
             "squadron_rating": _worst_rating(pilot_ratings),
             "t1_count": counts[TRating.T1.value],
             "t2_count": counts[TRating.T2.value],
             "t3_count": counts[TRating.T3.value],
-            "pilots_rated": len(pilots),
+            "pilots_rated": len(person_summaries),
         })
+    overall = _worst_rating([ps["overall_rating"] for ps in person_summaries])
+    return area_rollups, overall, len(person_summaries)
 
-    all_ratings = [ps["overall_rating"] for ps in person_summaries]
+
+def build_squadron_readiness(db: Session, today: Optional[date] = None) -> dict:
+    today = today or date.today()
+    pilots = (
+        db.query(Person)
+        .options(joinedload(Person.currencies))
+        .filter(Person.is_active.is_(True), Person.role == Role.PILOT)
+        .order_by(Person.last_name, Person.first_name)
+        .all()
+    )
+    aircrew = (
+        db.query(Person)
+        .options(joinedload(Person.currencies))
+        .filter(Person.is_active.is_(True), Person.role == Role.AIRCREW)
+        .order_by(Person.last_name, Person.first_name)
+        .all()
+    )
+
+    person_summaries = [build_person_readiness(db, p, today) for p in pilots]
+    aircrew_summaries = [build_person_readiness(db, p, today) for p in aircrew]
+    area_rollups, squadron_overall, pilots_rated = _rollup_for_persons(person_summaries, today)
+    _, aircrew_overall, _ = _rollup_for_persons(aircrew_summaries, today)
+
     return {
         "as_of_date": today,
-        "pilots_rated": len(pilots),
-        "squadron_overall_rating": _worst_rating(all_ratings),
+        "pilots_rated": pilots_rated,
+        "aircrew_rated": len(aircrew_summaries),
+        "squadron_overall_rating": squadron_overall,
+        "aircrew_overall_rating": aircrew_overall,
         "areas": area_rollups,
         "persons": person_summaries,
+        "aircrew": aircrew_summaries,
     }

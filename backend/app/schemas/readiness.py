@@ -18,6 +18,8 @@ class PersonAreaRating(BaseModel):
     rating: str
     contributing_factors: List[str] = []
     anchor_tasks: List[AnchorTaskStatus] = []
+    t1_window_days: Optional[int] = None
+    t2_window_days: Optional[int] = None
 
 
 class PersonReadinessSummary(BaseModel):
@@ -42,6 +44,9 @@ class SquadronAreaSummary(BaseModel):
 class SquadronReadinessOut(BaseModel):
     as_of_date: date
     pilots_rated: int
+    aircrew_rated: int = 0
     squadron_overall_rating: str
+    aircrew_overall_rating: Optional[str] = None
     areas: List[SquadronAreaSummary]
     persons: List[PersonReadinessSummary]
+    aircrew: List[PersonReadinessSummary] = []

@@ -40,7 +40,7 @@ export default function CrewDetail() {
   const { data: readiness } = useQuery({
     queryKey: ["person-readiness", personId],
     queryFn: () => fetchPersonReadiness(personId),
-    enabled: !isNaN(personId) && data?.role === "pilot",
+    enabled: !isNaN(personId) && (data?.role === "pilot" || data?.role === "aircrew"),
   });
 
   if (isLoading) return <Loading />;
@@ -236,15 +236,38 @@ function ReadinessCard({
         ))}
       </div>
       {degraded.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="text-xs text-slate-500 uppercase tracking-wide">Contributing factors</p>
           {degraded.map((area) => (
             <div key={area.capability_area} className="text-sm">
-              <span className="text-slate-300 font-mono">{area.capability_area}</span>
-              <span className="text-slate-500 mx-2">·</span>
-              <span className="text-slate-400 text-xs">
-                {area.contributing_factors.join("; ") || "Below T-1 threshold"}
-              </span>
+              <div>
+                <span className="text-slate-300 font-mono">{area.capability_area}</span>
+                <span className="text-slate-500 mx-2">·</span>
+                <span className="text-slate-400 text-xs">
+                  {area.contributing_factors.join("; ") || "Below T-1 threshold"}
+                </span>
+              </div>
+              {area.anchor_tasks.length > 0 && (
+                <ul className="mt-1 ml-2 text-xs space-y-0.5">
+                  {area.anchor_tasks.map((a) => (
+                    <li
+                      key={a.task_code}
+                      className={
+                        a.status === "current"
+                          ? "text-green-400/80"
+                          : a.status === "stale"
+                            ? "text-yellow-400/80"
+                            : "text-red-400/80"
+                      }
+                    >
+                      <span className="font-mono text-slate-500">{a.task_code}</span>
+                      {" — "}
+                      {a.status === "current" ? "Current" : a.status === "stale" ? "Stale" : "Absent"}
+                      {a.days_since != null && ` (${a.days_since}d)`}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           ))}
         </div>

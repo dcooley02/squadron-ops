@@ -1021,6 +1021,8 @@ export interface PersonAreaRating {
   rating: TRating;
   contributing_factors: string[];
   anchor_tasks: AnchorTaskStatus[];
+  t1_window_days?: number;
+  t2_window_days?: number;
 }
 
 export interface PersonReadinessSummary {
@@ -1045,9 +1047,12 @@ export interface SquadronAreaSummary {
 export interface SquadronReadiness {
   as_of_date: string;
   pilots_rated: number;
+  aircrew_rated: number;
   squadron_overall_rating: TRating;
+  aircrew_overall_rating: TRating | null;
   areas: SquadronAreaSummary[];
   persons: PersonReadinessSummary[];
+  aircrew: PersonReadinessSummary[];
 }
 
 export const fetchSquadronReadiness = async (): Promise<SquadronReadiness> => {
@@ -1062,6 +1067,20 @@ export const fetchPersonReadiness = async (
     `/api/readiness/persons/${personId}`
   );
   return data;
+};
+
+export const downloadReadinessBriefPdf = async (): Promise<void> => {
+  const response = await api.get("/api/readiness/squadron/brief.pdf", {
+    responseType: "blob",
+  });
+  const blobUrl = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = "readiness_brief.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(blobUrl);
 };
 
 // ---------- Training boards (Phase 4) ----------

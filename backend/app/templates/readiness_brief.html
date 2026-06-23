@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    @page { size: letter; margin: 0.6in; }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #111; }
+    h1 { font-size: 14pt; margin: 0 0 4px 0; }
+    .meta { font-size: 8pt; color: #444; margin-bottom: 12px; }
+    h2 { font-size: 11pt; margin: 14px 0 6px 0; border-bottom: 1px solid #999; }
+    table { width: 100%; border-collapse: collapse; font-size: 8pt; margin-bottom: 10px; }
+    th, td { border: 1px solid #bbb; padding: 3px 5px; vertical-align: top; }
+    th { background: #e8e8e8; text-align: left; }
+    .t1 { color: #0a6b0a; font-weight: bold; }
+    .t2 { color: #9a7b00; font-weight: bold; }
+    .t3 { color: #a00; font-weight: bold; }
+    .factors { font-size: 7pt; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>SQUADRON CAPABILITY READINESS BRIEF</h1>
+  <div class="meta">
+    As of {{ as_of_date }} · Squadron overall: <strong>{{ squadron_overall }}</strong>
+    · {{ pilots_rated }} pilots rated
+    {% if aircrew_rated %} · {{ aircrew_rated }} aircrew (overall {{ aircrew_overall }}){% endif %}
+  </div>
+
+  <h2>Capability Area Rollup</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Area</th><th>Squadron</th><th>T-1</th><th>T-2</th><th>T-3</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in areas %}
+      <tr>
+        <td><strong>{{ a.capability_area }}</strong> — {{ a.label }}</td>
+        <td class="{{ a.squadron_rating | lower | replace('-', '') }}">{{ a.squadron_rating }}</td>
+        <td>{{ a.t1_count }}</td>
+        <td>{{ a.t2_count }}</td>
+        <td>{{ a.t3_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Pilot Detail</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Pilot</th><th>Overall</th>
+        {% for a in areas %}<th>{{ a.capability_area }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in persons %}
+      <tr>
+        <td>{{ p.person_name }}{% if p.callsign %} ({{ p.callsign }}){% endif %}</td>
+        <td>{{ p.overall_rating }}</td>
+        {% for a in areas %}
+        {% set row = p.areas | selectattr('capability_area', 'equalto', a.capability_area) | first %}
+        <td>{{ row.rating if row else '—' }}</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Contributing Factors (non-T-1)</h2>
+  {% for p in persons %}
+    {% set degraded = p.areas | selectattr('rating', 'ne', 'T-1') | list %}
+    {% if degraded %}
+    <p><strong>{{ p.person_name }}</strong></p>
+    <ul class="factors">
+      {% for area in degraded %}
+      <li>{{ area.capability_area }} ({{ area.rating }}): {{ area.contributing_factors | join('; ') }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  {% endfor %}
+
+  {% if aircrew %}
+  <h2>Aircrew Summary</h2>
+  <table>
+    <thead><tr><th>Aircrew</th><th>Overall</th></tr></thead>
+    <tbody>
+      {% for p in aircrew %}
+      <tr><td>{{ p.person_name }}</td><td>{{ p.overall_rating }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <p class="meta" style="margin-top:16px;">
+    T-ratings derived from Appendix D anchor-task recency (Q/CQ credits) and Table B-2 currency gates.
+    Not a substitute for official SHARP output — hand-check before operational claims.
+  </p>
+</body>
+</html>
