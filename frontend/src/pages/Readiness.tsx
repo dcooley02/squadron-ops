@@ -2,20 +2,53 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
-import { fetchSquadronReadiness, type CapabilityArea, type SquadronReadiness } from "../lib/api";
+import { FileDown } from "lucide-react";
+import {
+  downloadReadinessBriefPdf,
+  fetchSquadronReadiness,
+  type AnchorTaskStatus,
+  type CapabilityArea,
+  type SquadronReadiness,
+} from "../lib/api";
 import Loading from "../components/Loading";
 import TRatingBadge from "../components/TRatingBadge";
 import { formatDate } from "../lib/dates";
 
 const AREA_ORDER: CapabilityArea[] = ["MOB", "FSO", "ASU", "SOF", "PR", "STW", "LOG", "MIW"];
 
+function anchorStatusLabel(status: string): string {
+  if (status === "current") return "Current";
+  if (status === "stale") return "Stale";
+  return "Absent";
+}
+
+function anchorStatusClass(status: string): string {
+  if (status === "current") return "text-green-400";
+  if (status === "stale") return "text-yellow-400";
+  return "text-red-400";
+}
+
 export default function Readiness() {
   const [selectedArea, setSelectedArea] = useState<CapabilityArea | null>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["squadron-readiness"],
     queryFn: fetchSquadronReadiness,
   });
+
+  const handleExportPdf = async () => {
+    setPdfError(null);
+    setPdfLoading(true);
+    try {
+      await downloadReadinessBriefPdf();
+    } catch {
+      setPdfError("PDF export failed. WeasyPrint may not be installed on the server (HTTP 503).");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
 
   if (isLoading) return <Loading message="Computing WTM readiness..." />;
   if (error || !data) {
@@ -40,12 +73,27 @@ export default function Readiness() {
             Distinct from individual B-2 currency status on the dashboard.
           </p>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-slate-500 uppercase tracking-wide">Squadron overall</div>
-          <TRatingBadge rating={data.squadron_overall_rating} large />
-          <div className="text-xs text-slate-500 mt-1">
-            As of {formatDate(data.as_of_date)} · {data.pilots_rated} pilots rated
+        <div className="flex flex-col items-end gap-2">
+          <div className="text-right">
+            <div className="text-xs text-slate-500 uppercase tracking-wide">Squadron overall</div>
+            <TRatingBadge rating={data.squadron_overall_rating} large />
+            <div className="text-xs text-slate-500 mt-1">
+              As of {formatDate(data.as_of_date)} · {data.pilots_rated} pilots rated
+              {data.aircrew_rated > 0 && (
+                <> · {data.aircrew_rated} aircrew ({data.aircrew_overall_rating})</>
+              )}
+            </div>
           </div>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={pdfLoading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded border border-slate-700 hover:bg-slate-800 disabled:opacity-50"
+          >
+            <FileDown size={14} />
+            {pdfLoading ? "Exporting…" : "Export PDF"}
+          </button>
+          {pdfError && <p className="text-xs text-red-400 max-w-xs text-right">{pdfError}</p>}
         </div>
       </div>
 
@@ -88,66 +136,122 @@ export default function Readiness() {
             Squadron limiting rating: <TRatingBadge rating={selectedRollup.squadron_rating} />{" "}
             (worst pilot in this area)
           </p>
-          <AreaPilotTable data={data} area={selectedRollup.capability_area} />
+          <AreaPilotTable data={data} area={selectedRollup.capability_area} showAnchors />
         </section>
       )}
 
       <section className="card">
         <h2 className="mb-3">Pilot T-Ratings</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-500 uppercase tracking-wide border-b border-slate-800">
-                <th className="font-medium py-2 pr-3">Pilot</th>
-                <th className="font-medium py-2 pr-3">Overall</th>
-                {AREA_ORDER.map((code) => (
-                  <th key={code} className="font-medium py-2 pr-2 text-center font-mono">
-                    {code}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.persons.map((p) => (
-                <tr key={p.person_id} className="border-t border-slate-800">
-                  <td className="py-2 pr-3">
-                    <Link
-                      to={`/crew/${p.person_id}`}
-                      className="text-blue-400 hover:text-blue-300"
-                    >
-                      {p.person_name}
-                      {p.callsign && (
-                        <span className="text-slate-500 ml-1">"{p.callsign}"</span>
-                      )}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <TRatingBadge rating={p.overall_rating} />
-                  </td>
-                  {AREA_ORDER.map((code) => {
-                    const area = p.areas.find((a) => a.capability_area === code);
-                    return (
-                      <td key={code} className="py-2 pr-2 text-center">
-                        {area ? <TRatingBadge rating={area.rating} /> : "—"}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <PersonRatingTable persons={data.persons} />
       </section>
+
+      {data.aircrew.length > 0 && (
+        <section className="card">
+          <div className="flex items-center justify-between mb-3">
+            <h2>Aircrew T-Ratings</h2>
+            {data.aircrew_overall_rating && (
+              <TRatingBadge rating={data.aircrew_overall_rating} />
+            )}
+          </div>
+          <p className="text-sm text-slate-400 mb-3">
+            Aircrew rated against the same anchor-task matrix (informational rollup).
+          </p>
+          <PersonRatingTable persons={data.aircrew} />
+        </section>
+      )}
     </div>
+  );
+}
+
+function PersonRatingTable({
+  persons,
+}: {
+  persons: SquadronReadiness["persons"];
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-slate-500 uppercase tracking-wide border-b border-slate-800">
+            <th className="font-medium py-2 pr-3">Crewmember</th>
+            <th className="font-medium py-2 pr-3">Overall</th>
+            {AREA_ORDER.map((code) => (
+              <th key={code} className="font-medium py-2 pr-2 text-center font-mono">
+                {code}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {persons.map((p) => (
+            <tr key={p.person_id} className="border-t border-slate-800">
+              <td className="py-2 pr-3">
+                <Link
+                  to={`/crew/${p.person_id}`}
+                  className="text-blue-400 hover:text-blue-300"
+                >
+                  {p.person_name}
+                  {p.callsign && (
+                    <span className="text-slate-500 ml-1">"{p.callsign}"</span>
+                  )}
+                </Link>
+              </td>
+              <td className="py-2 pr-3">
+                <TRatingBadge rating={p.overall_rating} />
+              </td>
+              {AREA_ORDER.map((code) => {
+                const area = p.areas.find((a) => a.capability_area === code);
+                return (
+                  <td key={code} className="py-2 pr-2 text-center">
+                    {area ? <TRatingBadge rating={area.rating} /> : "—"}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AnchorTaskList({
+  anchors,
+  t1Window,
+  t2Window,
+}: {
+  anchors: AnchorTaskStatus[];
+  t1Window?: number;
+  t2Window?: number;
+}) {
+  if (anchors.length === 0) return null;
+  return (
+    <ul className="mt-1 space-y-0.5 text-xs">
+      {anchors.map((a) => (
+        <li key={a.task_code} className={anchorStatusClass(a.status)}>
+          <span className="font-mono text-slate-400">{a.task_code}</span>
+          {" — "}
+          {anchorStatusLabel(a.status)}
+          {a.days_since != null && ` (${a.days_since}d ago)`}
+        </li>
+      ))}
+      {(t1Window != null || t2Window != null) && (
+        <li className="text-slate-500">
+          Windows: T-1 ≤ {t1Window ?? "—"}d · T-2 ≤ {t2Window ?? "—"}d
+        </li>
+      )}
+    </ul>
   );
 }
 
 function AreaPilotTable({
   data,
   area,
+  showAnchors = false,
 }: {
   data: SquadronReadiness;
   area: CapabilityArea;
+  showAnchors?: boolean;
 }) {
   return (
     <table className="w-full text-sm">
@@ -164,12 +268,12 @@ function AreaPilotTable({
           if (!row) return null;
           return (
             <tr key={p.person_id} className="border-t border-slate-800/60">
-              <td className="py-2 pr-3">
+              <td className="py-2 pr-3 align-top">
                 <Link to={`/crew/${p.person_id}`} className="text-blue-400 hover:text-blue-300">
                   {p.person_name}
                 </Link>
               </td>
-              <td className="py-2 pr-3">
+              <td className="py-2 pr-3 align-top">
                 <TRatingBadge rating={row.rating} />
               </td>
               <td className="py-2 text-xs text-slate-400">
@@ -181,6 +285,13 @@ function AreaPilotTable({
                       <li key={i}>{f}</li>
                     ))}
                   </ul>
+                )}
+                {showAnchors && (
+                  <AnchorTaskList
+                    anchors={row.anchor_tasks}
+                    t1Window={row.t1_window_days}
+                    t2Window={row.t2_window_days}
+                  />
                 )}
               </td>
             </tr>
