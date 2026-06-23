@@ -1,7 +1,7 @@
 ================================================================================
 SQUADRON OPS v2 — PROJECT SUMMARY
 ================================================================================
-Last updated: June 2026 (post Phase 0/1 — tag v2.0-demo-rc1)
+Last updated: June 2026 (post Phase 2/3 — tag v2.0-demo-rc2)
 Repository: squadron-ops (forked from hsc-squadron-ops v1.0-demo)
 Community focus: HSC / MH-60S (single-squadron demo; multi-squadron deferred)
 Demo docs: DEMO_SCRIPT.txt (10-min walkthrough), DEMO_CHEATSHEET.txt (quick ref)
@@ -264,6 +264,7 @@ scheduling.py          Crew eligibility, fitness checks, NIGHT_NVD alignment
 aircraft_status.py     compute_status() from discrepancies + inspections
 aircraft_detail.py     Build AircraftDetail responses
 qa_release.py          QA release: close discs, validate blockers, stamp status
+readiness.py           WTM T-1/T-2/T-3 by capability area (compute-on-read)
 logbook.py             Logbook aggregation and landing deduplication
 logbook_pdf.py         PDF generation
 gradecards.py          Gradesheet logic
@@ -286,6 +287,8 @@ App shell (sidebar navigation, localhost:5174)
   /sorties/:id/complete      Complete Sortie — per-crew hours, mission profile,
                                discrepancies, safety reports, task credits
   /logbook/:personId         Digital logbook with PDF export
+  /readiness                 WTM capability readiness — squadron T-ratings,
+                               per-area drill-down, pilot matrix
   /schedule                  Schedule builder — create sorties, assign crew,
                                eligibility/fitness hints
   /training                  Training hub — syllabus, gradecards
@@ -301,7 +304,7 @@ App shell (sidebar navigation, localhost:5174)
 Fullscreen TV boards (no sidebar)
   /board/ops                 Operations board
   /board/maint               Maintenance board
-  /board/readiness           Squadron Snapshot board (operational metrics, not WTM)
+  /board/readiness           Squadron Snapshot board — ops metrics + WTM strip
 
 ================================================================================
 11. WORKING FEATURES (CURRENT DEMO STATE)
@@ -343,8 +346,12 @@ Training
 Readiness
   - Per-person qualifications and Wing Table B-2 currencies
   - Currency type catalog with applicability rules
-  - Dashboard currency warning counts
-  - Squadron Snapshot TV board (operational metrics only — WTM T-ratings NOT implemented)
+  - Dashboard distinguishes WTM capability T-ratings from Table B-2 currency counts
+  - WTM T-1/T-2/T-3 engine: anchor-task recency + optional currency gates per area
+  - GET /api/readiness/squadron and /api/readiness/persons/{id}
+  - /readiness page: squadron rollup, area drill-down, pilot matrix
+  - Crew detail: per-area T-ratings with contributing factors (pilots)
+  - Squadron Snapshot TV board: WTM T-rating strip across 8 capability areas
 
 Governance
   - HTTP audit middleware logging consequential API actions
@@ -367,7 +374,7 @@ When POST /logging/sorties/{id}/complete runs:
   2. Writes/updates FlightLog rows per crewmember (hours, landings, approaches)
   3. Renews applicable currencies (only advances if event_date >= last_event_date)
   4. Increments aircraft total_airframe_hours
-  5. Records SortieTaskCredit grades
+  5. Records SortieTaskCredit grades (SIM_TOFT skips non-sim-eligible CBR tasks)
   6. Files Discrepancy records if provided
   7. Creates SafetyReport records if provided
   8. Attaches SortieTmrCode hours
@@ -402,8 +409,9 @@ Batch 2 logging entry points partially done).
 
 Not implemented (committed future work per ROADMAP.md):
 
-  #2 Readiness Reports — Full WTM T-1/T-2/T-3 math per CHSCWPINST 3500.1F
-      Appendix D; capability area rollups; exportable readiness brief PDF
+  #2 Readiness Reports — Simplified WTM math shipped (Phase 3); still needed:
+      full Appendix D task library, exportable readiness brief PDF, hand-check
+      verification against known crew jackets
 
   #3 Maintenance deep-dive — Full CNAF M-4790.2 chain (complete MAF/WO model,
       work center routing, BCM, ASR/MSR logbook, release projections)
@@ -428,13 +436,13 @@ system integration.
 From KNOWN_ISSUES.md and development notes:
 
   - No authentication or authorization
-  - No automated test suite
+  - pytest smoke suite (aircraft status, QA release, cascade, readiness); CI on push
   - HSC-specific syllabus/currency catalog (community templates later)
   - datetime.utcnow() deprecation warnings in seed.py
   - Readiness Board: 41 N+1 gradecard fetches (performance)
   - Frontend production build fixed as of v2.0-demo-rc1 (npm run build passes)
-  - WTM T-rating math stubbed / not implemented
-  - Sim sortie (TOFT) currency credit rules not enforced
+  - WTM math is simplified (anchor tasks + currency gates), not full Appendix D
+  - Readiness PDF export not implemented
   - Full 4790 configuration management deferred
 
 ================================================================================
@@ -476,7 +484,7 @@ Legacy currency codes (avoid in new logic): NVG, NIGHT_DL — use NIGHT_NVD from
 18. DEMO READINESS ASSESSMENT (JUNE 2026)
 ================================================================================
 
-Status: demo-ready at tag v2.0-demo-rc1 (Phase 0/1 complete).
+Status: demo-ready at tag v2.0-demo-rc2 (Phase 2/3 complete).
 
 External browser review rated the platform credible for a 10-minute walkthrough.
 Core cascade (sortie completion → currency → maintenance status) works without
@@ -494,7 +502,12 @@ Phase 0/1 polish shipped:
   - Squadron Snapshot rename (was "Readiness Board")
   - SIM_TOFT seed sortie; third drift case (617 NMCS)
 
-Next phase (Phase 2): pytest smoke tests, CI pipeline, sim credit gating on CBR tasks.
+Phase 2/3 shipped:
+  - pytest + GitHub Actions CI (postgres → pytest → npm build)
+  - SIM_TOFT gates CBR task credits on sim_eligible (currencies already gated)
+  - WTM readiness API + /readiness UI + dashboard/board integration
+
+Next phase: full Appendix D seed, readiness PDF export, maintenance deep-dive (#3).
 
 ================================================================================
 END OF DOCUMENT

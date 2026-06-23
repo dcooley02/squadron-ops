@@ -768,3 +768,63 @@ export const qaRelease = async (
   );
   return data;
 };
+
+// ---------- WTM Capability Readiness ----------
+
+export type CapabilityArea = "MOB" | "FSO" | "ASU" | "SOF" | "PR" | "STW" | "LOG" | "MIW";
+export type TRating = "T-1" | "T-2" | "T-3";
+
+export interface AnchorTaskStatus {
+  task_code: string;
+  status: string;
+  days_since: number | null;
+}
+
+export interface PersonAreaRating {
+  capability_area: CapabilityArea;
+  label: string;
+  rating: TRating;
+  contributing_factors: string[];
+  anchor_tasks: AnchorTaskStatus[];
+}
+
+export interface PersonReadinessSummary {
+  person_id: number;
+  person_name: string;
+  callsign: string | null;
+  role: Role;
+  overall_rating: TRating;
+  areas: PersonAreaRating[];
+}
+
+export interface SquadronAreaSummary {
+  capability_area: CapabilityArea;
+  label: string;
+  squadron_rating: TRating;
+  t1_count: number;
+  t2_count: number;
+  t3_count: number;
+  pilots_rated: number;
+}
+
+export interface SquadronReadiness {
+  as_of_date: string;
+  pilots_rated: number;
+  squadron_overall_rating: TRating;
+  areas: SquadronAreaSummary[];
+  persons: PersonReadinessSummary[];
+}
+
+export const fetchSquadronReadiness = async (): Promise<SquadronReadiness> => {
+  const { data } = await api.get<SquadronReadiness>("/api/readiness/squadron");
+  return data;
+};
+
+export const fetchPersonReadiness = async (
+  personId: number
+): Promise<PersonReadinessSummary> => {
+  const { data } = await api.get<PersonReadinessSummary>(
+    `/api/readiness/persons/${personId}`
+  );
+  return data;
+};

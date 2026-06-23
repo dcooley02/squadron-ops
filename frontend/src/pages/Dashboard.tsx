@@ -7,6 +7,7 @@ import {
   fetchAircraft,
   fetchAircraftDetail,
   fetchUpcomingSorties,
+  fetchSquadronReadiness,
   type AircraftDetail,
   type SortieSummary,
 } from "../lib/api";
@@ -15,6 +16,7 @@ import MetricCard from "../components/MetricCard";
 import RateRing from "../components/RateRing";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
+import TRatingBadge from "../components/TRatingBadge";
 
 export default function Dashboard() {
   const { data, isLoading, error } = useQuery({
@@ -30,6 +32,11 @@ export default function Dashboard() {
   const { data: upcomingSorties } = useQuery({
     queryKey: ["upcoming-sorties"],
     queryFn: fetchUpcomingSorties,
+  });
+
+  const { data: readiness } = useQuery({
+    queryKey: ["squadron-readiness"],
+    queryFn: fetchSquadronReadiness,
   });
 
   const detailQueries = useQueries({
@@ -248,10 +255,49 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* Currency status section */}
+      {/* WTM capability readiness — distinct from B-2 currencies below */}
+      {readiness && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
+                Capability Readiness (WTM)
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                T-ratings from anchor-task recency — not the same as Table B-2 currency counts.
+              </p>
+            </div>
+            <Link
+              to="/readiness"
+              className="text-xs text-blue-400 hover:text-blue-300 shrink-0"
+            >
+              Full readiness board →
+            </Link>
+          </div>
+          <div className="card flex flex-wrap items-center gap-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 uppercase">Squadron</span>
+              <TRatingBadge rating={readiness.squadron_overall_rating} large />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {readiness.areas.map((area) => (
+                <div
+                  key={area.capability_area}
+                  className="flex items-center gap-1.5 rounded border border-slate-800 px-2 py-1"
+                >
+                  <span className="font-mono text-xs text-slate-500">{area.capability_area}</span>
+                  <TRatingBadge rating={area.squadron_rating} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Table B-2 currency status */}
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
-          Currency Status
+          Table B-2 Currencies
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <MetricCard

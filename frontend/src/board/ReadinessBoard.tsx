@@ -4,8 +4,10 @@ import clsx from "clsx";
 import {
   fetchDashboardSummary,
   fetchAircraft,
+  fetchSquadronReadiness,
   type AircraftStatus,
 } from "../lib/api";
+import TRatingBadge from "../components/TRatingBadge";
 import BoardLayout from "./BoardLayout";
 
 const QUERY_OPTS = {
@@ -89,6 +91,12 @@ export default function ReadinessBoard() {
     ...QUERY_OPTS,
   });
 
+  const { data: readiness } = useQuery({
+    queryKey: ["squadron-readiness"],
+    queryFn: fetchSquadronReadiness,
+    ...QUERY_OPTS,
+  });
+
   const sortedAircraft = [...(aircraft ?? [])].sort((a, b) =>
     (a.side_number ?? "").localeCompare(b.side_number ?? "")
   );
@@ -108,7 +116,7 @@ export default function ReadinessBoard() {
               Squadron Snapshot
             </h2>
             <p className="text-sm text-slate-500 mt-0.5">
-              Operational metrics — WTM T-ratings planned for a future release
+              Operational metrics plus WTM capability T-ratings
             </p>
           </div>
           <span className="text-xl text-slate-400 font-medium">
@@ -178,7 +186,34 @@ export default function ReadinessBoard() {
             </div>
           </div>
 
-          {/* ROW 2 — Currency overview */}
+          {/* ROW 2 — WTM T-rating strip */}
+          {readiness && (
+            <div
+              className="shrink-0 border-b border-slate-800 px-6 py-2 flex items-center gap-4"
+            >
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm font-bold uppercase tracking-widest text-slate-500">
+                  WTM
+                </span>
+                <TRatingBadge rating={readiness.squadron_overall_rating} large />
+              </div>
+              <div className="flex flex-1 justify-between gap-1 min-w-0">
+                {readiness.areas.map((area) => (
+                  <div
+                    key={area.capability_area}
+                    className="flex flex-col items-center min-w-0 flex-1"
+                  >
+                    <span className="text-xs font-mono text-slate-500 truncate w-full text-center">
+                      {area.capability_area}
+                    </span>
+                    <TRatingBadge rating={area.squadron_rating} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ROW 3 — Currency overview */}
           <div
             className="min-h-0 grid grid-cols-3 divide-x divide-slate-800 border-b border-slate-800"
             style={{ flex: "3 1 0" }}
@@ -244,7 +279,7 @@ export default function ReadinessBoard() {
             </div>
           </div>
 
-          {/* ROW 3 — Aircraft status strip */}
+          {/* ROW 4 — Aircraft status strip */}
           <div className="min-h-0 flex flex-col" style={{ flex: "3 1 0" }}>
             <div className="shrink-0 px-6 pt-3 pb-1">
               <span className="text-base font-bold uppercase tracking-widest text-slate-500">

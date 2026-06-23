@@ -23,7 +23,7 @@ const BOARDS = [
     icon: <Shield size={36} className="text-green-400" />,
     title: "Squadron Snapshot",
     description:
-      "FMC rate ring, personnel, 30-day activity, currency overview, and aircraft strip. Not WTM T-ratings.",
+      "FMC rate ring, personnel, WTM T-rating strip, currency overview, and aircraft strip.",
     accent: "hover:border-green-700/60",
   },
 ];

@@ -10,10 +10,17 @@ See ROADMAP.md for capabilities and ordering.
 
 ## Carried-over technical debt from v1
 - LOW papercuts deferred: crew header filter count, donut tooltip,
-  sortie year display, 41 N+1 gradecard fetches on Readiness Board
+  sortie year display, 41 N+1 gradecard fetches on Squadron Snapshot board
 - datetime.utcnow() deprecation warnings in seed.py (3 instances)
 - HSC-specific syllabus and currency catalog (will be replaced by
   per-community templates in roadmap item 6)
+
+## Phase 2/3 notes (June 2026)
+- WTM T-ratings use simplified anchor-task recency rules in
+  `backend/app/services/readiness.py` — not a full CHSCWPINST 3500.1F
+  Appendix D implementation; hand-check before stakeholder claims
+- Readiness PDF export not built yet
+- pytest suite requires Postgres (`TEST_DATABASE_URL`); CI runs on GitHub Actions
 
 ## Architecture invariants (don't break these)
 - Three-layer backend: SQLAlchemy models -> Pydantic schemas -> FastAPI routes

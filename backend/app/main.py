@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import persons, aircraft, sorties, dashboard, scheduling, logging as flight_logging, syllabus, currency, maintenance, tmr_codes, audit
+from app.api import persons, aircraft, sorties, dashboard, scheduling, logging as flight_logging, syllabus, currency, maintenance, tmr_codes, audit, readiness
 from app.middleware.audit import AuditLogMiddleware
 
 app = FastAPI(title="HSC Squadron Ops")
@@ -26,6 +26,7 @@ app.include_router(currency.router)
 app.include_router(maintenance.router)
 app.include_router(tmr_codes.router)
 app.include_router(audit.router)
+app.include_router(readiness.router)
 
 
 @app.get("/health")
