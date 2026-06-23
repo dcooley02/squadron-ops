@@ -81,6 +81,9 @@ export interface Discrepancy {
   is_open: boolean;
   opened_date: string;
   closed_date?: string | null;
+  // CNAF M-4790.2
+  type_wo_code?: string | null;
+  jcn?: string | null;
 }
 
 // backward compat alias
@@ -116,6 +119,16 @@ export interface AircraftDetail extends AircraftSummary {
   hours_to_phase: number;
 }
 
+export interface InstrumentApproachOut {
+  id: number;
+  approach_type: string;
+  actual_or_simulated: "ACTUAL" | "SIMULATED";
+  airport_icao: string | null;
+  runway: string | null;
+  remarks: string | null;
+  logged_at: string;
+}
+
 export interface FlightLogOut {
   id: number;
   person_id: number;
@@ -123,6 +136,40 @@ export interface FlightLogOut {
   crew_position: CrewPosition;
   hours_logged: number;
   syllabus_event_completed: string | null;
+  // Optional richer fields returned by /api/sorties/{id}; not always present on other endpoints
+  instructor_remarks?: string | null;
+  crew_qual_code?: string | null;
+  data_provenance?: "BACKFILLED" | "ENTERED" | null;
+  total_hours?: number | null;
+  first_pilot_hours?: number | null;
+  copilot_hours?: number | null;
+  ac_commander_hours?: number | null;
+  mission_commander_hours?: number | null;
+  instructor_hours?: number | null;
+  special_crew_time_hours?: number | null;
+  night_hours?: number | null;
+  nvg_hours?: number | null;
+  actual_instrument_hours?: number | null;
+  sim_instrument_hours?: number | null;
+  nvg_unaided_hl_hours?: number | null;
+  nvg_unaided_ll_hours?: number | null;
+  nvg_tactical_hl_hours?: number | null;
+  nvg_tactical_ll_hours?: number | null;
+  // Per-crewmember landings (B1)
+  landings_day?: number;
+  landings_night?: number;
+  landings_dve_day?: number;
+  landings_dve_night?: number;
+  landings_shipboard_day?: number;
+  landings_shipboard_night?: number;
+  instrument_approaches?: InstrumentApproachOut[];
+}
+
+export interface SortieTmrCodeOut {
+  code: string;
+  description: string | null;
+  slot: number;
+  hours: number | null;
 }
 
 export interface SortieSummary {
@@ -173,6 +220,7 @@ export interface SortieDetail extends SortieSummary {
   strafe_dry_profiles_night: number | null;
   flight_logs: FlightLogOut[];
   task_credits: SortieTaskCredit[];
+  tmr_codes?: SortieTmrCodeOut[] | null;
 }
 
 export interface DashboardSummary {
@@ -592,6 +640,80 @@ export const patchDiscrepancy = async (
   body: { work_status?: DiscrepancyWorkStatus; corrective_action?: string; system_affected?: string }
 ): Promise<Discrepancy> => {
   const { data } = await api.patch<Discrepancy>(`/api/maintenance/discrepancies/${id}`, body);
+  return data;
+};
+
+export interface TrainingJacketEntry {
+  sortie_id: number;
+  sortie_date: string;
+  event_code: string | null;
+  event_type: string | null;
+  flight_mode: string | null;
+  crew_position: CrewPosition;
+  hours_logged: number;
+  instructor_remarks: string | null;
+  syllabus_event_completed: string | null;
+  task_credits: Array<{ task_code: string; grade: string | null; remarks: string | null }>;
+}
+
+export const fetchPersonTrainingJacket = async (personId: number): Promise<TrainingJacketEntry[]> => {
+  const { data } = await api.get<TrainingJacketEntry[]>(
+    `/api/logging/persons/${personId}/training-jacket`
+  );
+  return data;
+};
+
+export type SafetyReportSeverity = "INFO" | "HAZARD" | "INCIDENT" | "MISHAP";
+export type SafetyReportStatus = "OPEN" | "UNDER_REVIEW" | "CLOSED";
+
+export interface SafetyReport {
+  id: number;
+  sortie_id: number | null;
+  reported_by_person_id: number | null;
+  severity: SafetyReportSeverity;
+  category: string | null;
+  description: string;
+  actions_taken: string | null;
+  status: SafetyReportStatus;
+  created_at: string;
+  closed_at: string | null;
+}
+
+export const fetchSafetyReportsForSortie = async (
+  sortieId: number
+): Promise<SafetyReport[]> => {
+  const { data } = await api.get<SafetyReport[]>("/api/logging/safety/reports", {
+    params: { sortie_id: sortieId },
+  });
+  return data;
+};
+
+export interface AuditLogEntry {
+  id: number;
+  ts: string;
+  actor: string | null;
+  method: string;
+  path: string;
+  query_string: string | null;
+  response_status: number;
+  request_body: unknown;
+  client_host: string | null;
+  duration_ms: number | null;
+}
+
+export const fetchAuditLog = async (params?: {
+  method?: string;
+  path_contains?: string;
+  limit?: number;
+}): Promise<AuditLogEntry[]> => {
+  const { data } = await api.get<AuditLogEntry[]>("/api/audit", { params });
+  return data;
+};
+
+export const fetchAircraftAdb = async (aircraftId: number): Promise<Discrepancy[]> => {
+  const { data } = await api.get<Discrepancy[]>(
+    `/api/logging/aircraft/${aircraftId}/adb`
+  );
   return data;
 };
 

@@ -56,8 +56,16 @@ class FlightLogOut(BaseModel):
     nvg_tactical_ll_hours: float = 0.0
     syllabus_event_completed: Optional[str] = None
     instructor_remarks: Optional[str] = None
+    crew_qual_code: Optional[str] = None
     special_crew_time_hours: Optional[float] = None
     data_provenance: DataProvenance = DataProvenance.ENTERED
+    # Per-crewmember landings (B1)
+    landings_day: int = 0
+    landings_night: int = 0
+    landings_dve_day: int = 0
+    landings_dve_night: int = 0
+    landings_shipboard_day: int = 0
+    landings_shipboard_night: int = 0
     instrument_approaches: List[InstrumentApproachRead] = []
 
 

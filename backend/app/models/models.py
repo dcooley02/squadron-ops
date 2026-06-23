@@ -2,6 +2,7 @@ from sqlalchemy import (
     Column, Integer, String, DateTime, Date, Float, Boolean,
     ForeignKey, Enum as SQLEnum, Text, JSON, UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -417,6 +418,8 @@ class FlightLog(Base):
     # New in flight-logging
     instructor_remarks = Column(Text, nullable=True)
     readiness_credits_count = Column(Integer, default=0, nullable=False)
+    # CNAF M-3710.7 single-letter qualification code, attached per-flight
+    crew_qual_code = Column(String(1), nullable=True)
 
     # Per-crewmember hour categories
     night_hours              = Column(Float, default=0.0, nullable=False)
@@ -438,6 +441,13 @@ class FlightLog(Base):
     # Logbook / NAVFLIR fields
     special_crew_time_hours  = Column(Float, default=0.0, nullable=False)   # maps to 3710.7 "Spec Crw" / SCT
     data_provenance = Column(SQLEnum(DataProvenance), default=DataProvenance.ENTERED, nullable=False)
+    # Per-crewmember landings (B1). Sortie-level columns remain as the rollup.
+    landings_day              = Column(Integer, default=0, nullable=False)
+    landings_night            = Column(Integer, default=0, nullable=False)
+    landings_dve_day          = Column(Integer, default=0, nullable=False)
+    landings_dve_night        = Column(Integer, default=0, nullable=False)
+    landings_shipboard_day    = Column(Integer, default=0, nullable=False)
+    landings_shipboard_night  = Column(Integer, default=0, nullable=False)
 
     sortie = relationship("Sortie", back_populates="flight_logs")
     person = relationship("Person", back_populates="flight_logs")
@@ -505,6 +515,9 @@ class Discrepancy(Base):
     work_status = Column(SQLEnum(DiscrepancyWorkStatus), default=DiscrepancyWorkStatus.OPEN, nullable=False)
     system_affected = Column(String, nullable=True)
     corrective_action = Column(Text, nullable=True)
+    # CNAF M-4790.2 work-order discrimination
+    type_wo_code = Column(String(2), nullable=True)
+    jcn = Column(String(9), nullable=True, index=True)
 
     # New in flight-logging
     sortie_id = Column(Integer, ForeignKey("sorties.id"), nullable=True, index=True)
@@ -680,3 +693,20 @@ class SortieTmrCode(Base):
 
     sortie = relationship("Sortie", back_populates="sortie_tmr_codes")
     tmr_code = relationship("TmrCode")
+
+
+# ---------- Audit log ----------
+
+class AuditLog(Base):
+    """Append-only record of every state-changing API call."""
+    __tablename__ = "audit_log"
+    id = Column(Integer, primary_key=True)
+    ts = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    actor = Column(String(120), nullable=True)
+    method = Column(String(8), nullable=False)
+    path = Column(String(512), nullable=False, index=True)
+    query_string = Column(String(512), nullable=True)
+    response_status = Column(Integer, nullable=False)
+    request_body = Column(JSONB, nullable=True)
+    client_host = Column(String(64), nullable=True)
+    duration_ms = Column(Integer, nullable=True)

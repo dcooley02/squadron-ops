@@ -29,6 +29,7 @@ export interface LogbookEntry {
   event_code: string | null;
   flight_mode: string;
   crew_position: string;
+  crew_qual_code: string | null;
   departure_location: string | null;
   arrival_location: string | null;
   total_hours: number;
@@ -144,6 +145,7 @@ export interface FlightLogFull {
   person_id: number;
   person_name: string;
   crew_position: string;
+  crew_qual_code: string | null;
   hours_logged: number;
   night_hours: number;
   nvg_hours: number;

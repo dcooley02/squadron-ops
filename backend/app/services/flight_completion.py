@@ -20,6 +20,7 @@ from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
 from app.schemas.scheduling import FlightLogCreate
 from app.services.currency_applicability import currencies_for_person
 from app.services.currency_renewal_rules import RENEWAL_RULES
+from app.services.jcn import assign_jcn
 
 
 def _upsert_currency_typed(
@@ -86,6 +87,20 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.landings_night          = payload.landings_night
     sortie.landings_dve_day        = payload.landings_dve_day
     sortie.landings_dve_night      = payload.landings_dve_night
+    # Mirror landings to the HAC's flight_log (per-crew source of truth, B1).
+    # A future CompleteSortie form revision will accept these per-crew rather
+    # than auto-derive them from the sortie totals.
+    _hac = next(
+        (fl for fl in sortie.flight_logs if fl.crew_position == CrewPosition.HAC),
+        None,
+    )
+    if _hac is not None:
+        _hac.landings_day             = payload.landings_day or 0
+        _hac.landings_night           = payload.landings_night or 0
+        _hac.landings_dve_day         = payload.landings_dve_day or 0
+        _hac.landings_dve_night       = payload.landings_dve_night or 0
+        _hac.landings_shipboard_day   = payload.landings_shipboard_day or 0
+        _hac.landings_shipboard_night = payload.landings_shipboard_night or 0
     sortie.hoist_streams           = payload.hoist_streams
     sortie.hoist_recoveries        = payload.hoist_recoveries
     sortie.amns_iterations         = payload.amns_iterations
@@ -255,6 +270,8 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             )
         ).scalar()
         maf = f"M-{year}-{(max_seq or 0) + 1:04d}"
+        opened = datetime.utcnow()
+        jcn = assign_jcn(db, opened_date=opened, model=Discrepancy)
         db.add(Discrepancy(
             aircraft_id=sortie.aircraft_id,
             sortie_id=sortie.id,
@@ -264,11 +281,13 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             system_affected=disc_spec.system_affected,
             notes=disc_spec.notes,
             maf_number=maf,
+            type_wo_code=disc_spec.type_wo_code or "DM",
+            jcn=jcn,
             work_status=DiscrepancyWorkStatus.OPEN,
-            opened_date=datetime.utcnow(),
+            opened_date=opened,
             is_open=True,
         ))
-        db.flush()  # make the new row visible for the next MAX query
+        db.flush()  # make the new row visible for the next MAX query and JCN sequence
 
     # ── Step 9: insert SafetyReport rows ────────────────────────────────────────
     for sr_spec in payload.safety_reports:
