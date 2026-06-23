@@ -60,13 +60,14 @@ export default function Maintenance() {
         <div className="card border-yellow-700/40 bg-yellow-950/20 space-y-2">
           <div className="flex items-center gap-2 text-yellow-400 font-medium text-sm">
             <AlertTriangle size={16} />
-            {driftingAircraft.length} aircraft with status drift — stamped status doesn't match
-            computed reality
+            Stamped vs. computed — {driftingAircraft.length} aircraft awaiting QA release
           </div>
           <div className="space-y-1">
             {driftingAircraft.map((ac) => {
+              const openDowning = ac.open_discrepancies.filter((d) => d.severity === "DOWNING").length;
+              const releaseBlocked = ac.computed_status === "NMCM" || ac.computed_status === "NMCS" || openDowning > 0;
               return (
-                <div key={ac.id} className="text-xs text-yellow-300/80 flex items-center gap-2">
+                <div key={ac.id} className="text-xs text-yellow-300/80 flex items-center gap-2 flex-wrap">
                   <span className="font-mono">{ac.side_number ?? ac.bureau_number}</span>
                   <span className="text-slate-500">·</span>
                   <span>
@@ -76,10 +77,15 @@ export default function Maintenance() {
                   <Badge variant={STATUS_VARIANT[ac.computed_status]}>{ac.computed_status}</Badge>
                   {ac.open_discrepancies.length > 0 && (
                     <span className="text-slate-400">
-                      ({ac.open_discrepancies.filter((d) => d.severity === "DOWNING").length} DOWNING,{" "}
-                      {ac.open_discrepancies.length} open total)
+                      ({openDowning} DOWNING, {ac.open_discrepancies.length} open total)
                     </span>
                   )}
+                  <Link
+                    to={`/maintenance/${ac.id}`}
+                    className={`ml-1 ${releaseBlocked ? "text-slate-500" : "text-green-400 hover:text-green-300"}`}
+                  >
+                    {releaseBlocked ? "resolve issues →" : "Release →"}
+                  </Link>
                 </div>
               );
             })}
@@ -205,7 +211,7 @@ function AircraftCard({ ac }: { ac: AircraftDetail }) {
       {drift && (
         <div className="mt-2 text-xs text-yellow-400 flex items-center gap-1">
           <AlertTriangle size={11} />
-          Status drift
+          Stamped ≠ computed
         </div>
       )}
     </Link>

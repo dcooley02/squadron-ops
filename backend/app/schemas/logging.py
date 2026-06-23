@@ -145,6 +145,7 @@ class SortieCompletePayload(BaseModel):
     actual_takeoff_time: datetime
     actual_land_time: datetime
     duration_hours: float
+    flight_mode: Optional[FlightMode] = None
     debrief_notes: Optional[str] = None
     # Activity quantities — all optional; null treated as 0 by the cascade.
     rounds_fired_20mm: Optional[int] = None

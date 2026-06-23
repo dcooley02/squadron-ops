@@ -10,6 +10,7 @@ from app.models.models import (
     SafetyReport, Discrepancy, Person, SortieTmrCode,
     CapabilityArea, DiscrepancySeverity, CrewPosition, FlightMode,
 )
+from app.api.sorties import _log_out
 from app.schemas.logging import (
     CbrTaskOptionOut,
     SortieCompletePayload,
@@ -21,7 +22,7 @@ from app.schemas.logging import (
     LogbookTmrOut,
     SortieTmrOut,
 )
-from app.schemas.sorties import SortieDetail, FlightLogOut
+from app.schemas.sorties import SortieDetail
 from app.schemas.aircraft import DiscrepancyOut
 from app.services.flight_completion import complete_sortie, create_and_complete_unscheduled
 from app.services.logbook import build_window_totals
@@ -61,42 +62,7 @@ def _sortie_detail(s: Sortie) -> SortieDetail:
         "is_complete": s.is_complete,
         "notes": s.notes,
         "tmr_codes": tmr_codes_out,
-        "flight_logs": [
-            FlightLogOut.model_validate({
-                "id": fl.id,
-                "person_id": fl.person_id,
-                "person_name": f"{fl.person.last_name}, {fl.person.first_name}",
-                "crew_position": fl.crew_position,
-                "hours_logged": fl.hours_logged,
-                "night_hours": fl.night_hours or 0.0,
-                "nvg_hours": fl.nvg_hours or 0.0,
-                "actual_instrument_hours": fl.actual_instrument_hours or 0.0,
-                "sim_instrument_hours": fl.sim_instrument_hours or 0.0,
-                "total_hours": fl.total_hours or fl.hours_logged,
-                "first_pilot_hours": fl.first_pilot_hours or 0.0,
-                "copilot_hours": fl.copilot_hours or 0.0,
-                "ac_commander_hours": fl.ac_commander_hours or 0.0,
-                "mission_commander_hours": fl.mission_commander_hours or 0.0,
-                "instructor_hours": fl.instructor_hours or 0.0,
-                "nvg_unaided_hl_hours": fl.nvg_unaided_hl_hours or 0.0,
-                "nvg_unaided_ll_hours": fl.nvg_unaided_ll_hours or 0.0,
-                "nvg_tactical_hl_hours": fl.nvg_tactical_hl_hours or 0.0,
-                "nvg_tactical_ll_hours": fl.nvg_tactical_ll_hours or 0.0,
-                "syllabus_event_completed": fl.syllabus_event_completed,
-                "instructor_remarks": fl.instructor_remarks,
-                "crew_qual_code": fl.crew_qual_code,
-                "special_crew_time_hours": fl.special_crew_time_hours,
-                "data_provenance": fl.data_provenance,
-                "landings_day": fl.landings_day or 0,
-                "landings_night": fl.landings_night or 0,
-                "landings_dve_day": fl.landings_dve_day or 0,
-                "landings_dve_night": fl.landings_dve_night or 0,
-                "landings_shipboard_day": fl.landings_shipboard_day or 0,
-                "landings_shipboard_night": fl.landings_shipboard_night or 0,
-                "instrument_approaches": [],
-            })
-            for fl in s.flight_logs
-        ],
+        "flight_logs": [_log_out(fl) for fl in s.flight_logs],
     })
 
 
@@ -107,6 +73,7 @@ def _load_sortie_full(db: Session, sortie_id: int) -> Sortie:
         .options(
             joinedload(Sortie.aircraft),
             joinedload(Sortie.flight_logs).joinedload(FlightLog.person),
+            joinedload(Sortie.flight_logs).joinedload(FlightLog.instrument_approaches),
             joinedload(Sortie.sortie_tmr_codes).joinedload(SortieTmrCode.tmr_code),
         )
         .filter(Sortie.id == sortie_id)

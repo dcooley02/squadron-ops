@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
@@ -7,6 +8,7 @@ import {
   fetchCbrTaskOptions,
   completeSortie as completeSortieApi,
   type SortieCompletePayload,
+  type FlightLogActualsPayload,
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
@@ -26,6 +28,48 @@ interface CrewActual {
   person_name: string;
   crew_position: string;
   hours_logged: string;
+  night_hours: string;
+  nvg_hours: string;
+  actual_instrument_hours: string;
+}
+
+function roleHoursForPosition(position: string, hours: number) {
+  switch (position) {
+    case "HAC":
+      return { ac_commander_hours: hours, first_pilot_hours: hours };
+    case "H2P":
+    case "H2P_U":
+      return { copilot_hours: hours };
+    case "CREW_CHIEF":
+    case "AIRCREW":
+    case "AWS":
+      return { special_crew_time_hours: hours };
+    default:
+      return {};
+  }
+}
+
+function buildFlightLogActuals(
+  crewActuals: CrewActual[],
+  mission: { nightH: string; nvgH: string; instrH: string },
+  eventCode: string | null | undefined
+): FlightLogActualsPayload[] {
+  return crewActuals.map((c) => {
+    const hours = parseFloat(c.hours_logged) || 0;
+    const night = parseFloat(c.night_hours) || parseFloat(mission.nightH) || 0;
+    const nvg = parseFloat(c.nvg_hours) || parseFloat(mission.nvgH) || 0;
+    const instr = parseFloat(c.actual_instrument_hours) || parseFloat(mission.instrH) || 0;
+    return {
+      flight_log_id: c.flight_log_id,
+      hours_logged: hours,
+      total_hours: hours,
+      night_hours: night,
+      nvg_hours: nvg,
+      actual_instrument_hours: instr,
+      syllabus_event_completed: eventCode || null,
+      ...roleHoursForPosition(c.crew_position, hours),
+    };
+  });
 }
 
 interface TaskCreditRow {
@@ -196,7 +240,17 @@ export default function CompleteSortie() {
     setTakeoff(toStr);
     setLand(landStr);
     setDuration(defDurStr);
-    setDayH(defDurStr);
+    const isNvgMission = sortie.event_type?.toUpperCase().includes("NVG") ?? false;
+    const takeoffHour = sortie.takeoff_time
+      ? parseISO(sortie.takeoff_time).getHours()
+      : 12;
+    const isNightMission = takeoffHour >= 19 || takeoffHour < 5;
+    const defaultNight = isNvgMission || isNightMission ? defDurStr : "0.0";
+    const defaultNvg = isNvgMission ? defDurStr : "0.0";
+
+    setDayH(isNvgMission || isNightMission ? "0.0" : defDurStr);
+    setNightH(defaultNight);
+    setNvgH(defaultNvg);
     setFlightMode((sortie.flight_mode as FlightMode) ?? "LIVE");
     setCrewActuals(
       sortie.flight_logs.map((fl) => ({
@@ -204,6 +258,9 @@ export default function CompleteSortie() {
         person_name: fl.person_name,
         crew_position: fl.crew_position,
         hours_logged: defDurStr,
+        night_hours: defaultNight,
+        nvg_hours: defaultNvg,
+        actual_instrument_hours: "0.0",
       }))
     );
     setInitialized(true);
@@ -251,16 +308,14 @@ export default function CompleteSortie() {
         actual_takeoff_time: takeoff + ":00",
         actual_land_time: land + ":00",
         duration_hours: dur,
-        day_hours: parseFloat(dayH) || 0,
-        night_hours: parseFloat(nightH) || 0,
-        nvg_hours: parseFloat(nvgH) || 0,
-        instrument_hours: parseFloat(instrH) || 0,
+        flight_mode: flightMode,
         debrief_notes: debriefNotes || null,
         ...activityFields,
-        flight_log_actuals: crewActuals.map((c) => ({
-          flight_log_id: c.flight_log_id,
-          hours_logged: parseFloat(c.hours_logged) || 0,
-        })),
+        flight_log_actuals: buildFlightLogActuals(
+          crewActuals,
+          { nightH, nvgH, instrH },
+          sortie.event_code
+        ),
         task_credits: taskRows
           .filter((r) => r.task_code && r.person_id)
           .map((r) => ({
@@ -293,6 +348,8 @@ export default function CompleteSortie() {
       qc.invalidateQueries({ queryKey: ["aircraft-detail"] });
       qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
       qc.invalidateQueries({ queryKey: ["upcoming-sorties"] });
+      qc.invalidateQueries({ queryKey: ["person"] });
+      qc.invalidateQueries({ queryKey: ["persons"] });
       navigate(`/sorties/${sortieId}`);
     },
     onError: (err: Error) => {
@@ -460,7 +517,24 @@ export default function CompleteSortie() {
 
       {/* ── Section 2: Crew Hours ────────────────────────────────────────── */}
       <Section title="Crew Hours" required defaultOpen>
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() =>
+              setCrewActuals((prev) =>
+                prev.map((c) => ({
+                  ...c,
+                  hours_logged: duration,
+                  night_hours: nightH,
+                  nvg_hours: nvgH,
+                  actual_instrument_hours: instrH,
+                }))
+              )
+            }
+            className="text-xs text-blue-400 hover:text-blue-300"
+          >
+            Apply mission profile to all crew
+          </button>
           <button
             type="button"
             onClick={() =>
@@ -476,28 +550,57 @@ export default function CompleteSortie() {
         ) : (
           <div className="space-y-2">
             {crewActuals.map((ca, i) => (
-              <div key={ca.flight_log_id} className="flex items-center gap-3">
-                <Badge variant="neutral" className="shrink-0 text-xs">
-                  {ca.crew_position.replace(/_/g, " ")}
-                </Badge>
-                <span className="text-sm text-slate-300 flex-1 min-w-0 truncate">
-                  {ca.person_name}
-                </span>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={ca.hours_logged}
-                  onChange={(e) =>
-                    setCrewActuals((prev) =>
-                      prev.map((c, j) =>
-                        j === i ? { ...c, hours_logged: e.target.value } : c
+              <div key={ca.flight_log_id} className="space-y-2 py-2 border-b border-slate-800 last:border-0">
+                <div className="flex items-center gap-3">
+                  <Badge variant="neutral" className="shrink-0 text-xs">
+                    {ca.crew_position.replace(/_/g, " ")}
+                  </Badge>
+                  <span className="text-sm text-slate-300 flex-1 min-w-0 truncate">
+                    {ca.person_name}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={ca.hours_logged}
+                    onChange={(e) =>
+                      setCrewActuals((prev) =>
+                        prev.map((c, j) =>
+                          j === i ? { ...c, hours_logged: e.target.value } : c
+                        )
                       )
-                    )
-                  }
-                  className="w-24 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
-                />
-                <span className="text-xs text-slate-500 w-4">h</span>
+                    }
+                    className="w-24 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
+                  />
+                  <span className="text-xs text-slate-500 w-4">h</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 pl-1">
+                  {(
+                    [
+                      ["Night", "night_hours"],
+                      ["NVG", "nvg_hours"],
+                      ["Instr", "actual_instrument_hours"],
+                    ] as const
+                  ).map(([label, field]) => (
+                    <div key={field}>
+                      <Lbl>{label}</Lbl>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={ca[field]}
+                        onChange={(e) =>
+                          setCrewActuals((prev) =>
+                            prev.map((c, j) =>
+                              j === i ? { ...c, [field]: e.target.value } : c
+                            )
+                          )
+                        }
+                        className={INPUT_CLS}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

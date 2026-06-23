@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle, Wrench } from "lucide-react";
+import { ArrowLeft, CheckCircle, ShieldCheck, Wrench } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
 import {
   fetchAircraftDetail,
@@ -9,6 +9,7 @@ import {
   fetchAircraftDiscrepancies,
   patchDiscrepancy,
   patchInspection,
+  qaRelease,
   type AircraftInspection,
   type Discrepancy,
   type AircraftStatus,
@@ -52,6 +53,218 @@ const WS_LABEL: Record<DiscrepancyWorkStatus, string> = {
   COMPLETED: "Completed",
   CLOSED: "Closed",
 };
+
+// ── QA release preview helpers (mirror backend compute_status rules) ────────
+
+const NON_RELEASE: AircraftStatus[] = ["NMC", "NMCM", "NMCS"];
+
+function previewComputedStatus(
+  openDiscs: Discrepancy[],
+  overdueDowningInspections: AircraftInspection[]
+): AircraftStatus {
+  if (openDiscs.some((d) => d.severity === "DOWNING" && d.work_status === "AWP")) return "NMCS";
+  if (openDiscs.some((d) => d.severity === "DOWNING")) return "NMCM";
+  if (overdueDowningInspections.length > 0) return "NMCM";
+  if (openDiscs.some((d) => d.severity === "MAJOR")) return "PMC";
+  return "FMC";
+}
+
+function collectReleaseBlockers(
+  openDiscs: Discrepancy[],
+  overdueDowningInspections: AircraftInspection[]
+): string[] {
+  const blockers: string[] = [];
+  for (const d of openDiscs.filter((x) => x.severity === "DOWNING")) {
+    blockers.push(`Open DOWNING discrepancy ${d.maf_number ?? `#${d.id}`}`);
+  }
+  for (const insp of overdueDowningInspections) {
+    blockers.push(`Overdue downing inspection: ${insp.inspection_type.name}`);
+  }
+  const computed = previewComputedStatus(openDiscs, overdueDowningInspections);
+  if (NON_RELEASE.includes(computed)) {
+    blockers.push(`Computed status is ${computed} — not safe for flight until maintenance is complete`);
+  }
+  return blockers;
+}
+
+// ── Modal: QA Release ──────────────────────────────────────────────────────
+
+function QaReleaseModal({
+  ac,
+  openDiscs,
+  inspections,
+  onClose,
+}: {
+  ac: { id: number; status: AircraftStatus; computed_status: AircraftStatus; side_number: string | null };
+  openDiscs: Discrepancy[];
+  inspections: AircraftInspection[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [qaNotes, setQaNotes] = useState("");
+  const [correctiveAction, setCorrectiveAction] = useState("");
+  const [closeIds, setCloseIds] = useState<Set<number>>(new Set());
+
+  const overdueDowning = (inspections ?? []).filter(
+    (i) => i.is_overdue && i.inspection_type.is_downing_when_overdue
+  );
+  const remainingOpen = openDiscs.filter((d) => !closeIds.has(d.id));
+  const previewStatus = previewComputedStatus(remainingOpen, overdueDowning);
+  const blockers = collectReleaseBlockers(remainingOpen, overdueDowning);
+  const canSubmit = qaNotes.trim().length > 0 && blockers.length === 0;
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      qaRelease(ac.id, {
+        qa_notes: qaNotes.trim(),
+        close_discrepancy_ids: closeIds.size > 0 ? [...closeIds] : undefined,
+        corrective_action: correctiveAction.trim() || undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["aircraft-detail", ac.id] });
+      qc.invalidateQueries({ queryKey: ["aircraft-discrepancies", ac.id] });
+      qc.invalidateQueries({ queryKey: ["aircraft-inspections", ac.id] });
+      qc.invalidateQueries({ queryKey: ["aircraft"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      onClose();
+    },
+  });
+
+  const serverBlockers =
+    mutation.isError &&
+    mutation.error &&
+    typeof mutation.error === "object" &&
+    "response" in mutation.error &&
+    mutation.error.response &&
+    typeof mutation.error.response === "object" &&
+    "data" in mutation.error.response &&
+    mutation.error.response.data &&
+    typeof mutation.error.response.data === "object" &&
+    "detail" in mutation.error.response.data &&
+    mutation.error.response.data.detail &&
+    typeof mutation.error.response.data.detail === "object" &&
+    "blockers" in mutation.error.response.data.detail
+      ? (mutation.error.response.data.detail.blockers as string[])
+      : null;
+
+  const toggleClose = (id: number) => {
+    setCloseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <h3 className="text-base font-semibold mb-1 flex items-center gap-2">
+        <ShieldCheck size={18} className="text-green-400" />
+        QA Release — Safe for Flight
+      </h3>
+      <p className="text-xs text-slate-400 mb-4">
+        After QA signoff, release aircraft safe for flight at line status{" "}
+        <span className="font-semibold text-slate-300">{ac.status}</span>
+        {" → "}
+        <span className="font-semibold text-slate-300">{previewStatus}</span>
+        {ac.status !== previewStatus && (
+          <span className="text-yellow-400 ml-1">(sync with computed)</span>
+        )}
+      </p>
+
+      {blockers.length > 0 && (
+        <div className="mb-4 p-2.5 bg-red-950/30 border border-red-800/40 rounded text-xs text-red-300 space-y-1">
+          <div className="font-medium text-red-400">Release blocked — not safe for flight</div>
+          {blockers.map((b) => (
+            <div key={b}>• {b}</div>
+          ))}
+        </div>
+      )}
+
+      {openDiscs.length > 0 && (
+        <div className="mb-4">
+          <label className="block text-xs text-slate-400 mb-2">
+            Close discrepancies with this release (optional)
+          </label>
+          <div className="space-y-2 max-h-40 overflow-y-auto">
+            {openDiscs.map((d) => (
+              <label
+                key={d.id}
+                className="flex items-start gap-2 p-2 rounded bg-slate-800/50 border border-slate-700/50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={closeIds.has(d.id)}
+                  onChange={() => toggleClose(d.id)}
+                  className="mt-0.5"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-mono text-xs text-slate-300">
+                      {d.maf_number ?? `#${d.id}`}
+                    </span>
+                    <Badge variant={SEV_VARIANT[d.severity]}>{d.severity}</Badge>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{d.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {closeIds.size > 0 && (
+        <div className="mb-4">
+          <label className="block text-xs text-slate-400 mb-1">
+            Corrective action (applied to selected discrepancies)
+          </label>
+          <textarea
+            value={correctiveAction}
+            onChange={(e) => setCorrectiveAction(e.target.value)}
+            rows={2}
+            placeholder="Describe corrective action for closed items…"
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm resize-none"
+          />
+        </div>
+      )}
+
+      <div className="mb-4">
+        <label className="block text-xs text-slate-400 mb-1">QA signoff notes *</label>
+        <textarea
+          value={qaNotes}
+          onChange={(e) => setQaNotes(e.target.value)}
+          rows={3}
+          placeholder="QA inspection complete, aircraft cleared for line operations…"
+          className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm resize-none"
+        />
+      </div>
+
+      <div className="flex gap-2 justify-end">
+        <button onClick={onClose} className="btn-secondary text-sm">
+          Cancel
+        </button>
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending || !canSubmit}
+          className="btn-primary text-sm"
+        >
+          {mutation.isPending ? "Processing…" : "Release for Flight"}
+        </button>
+      </div>
+
+      {serverBlockers && (
+        <div className="mt-3 text-xs text-red-400 space-y-1">
+          {serverBlockers.map((b) => (
+            <div key={b}>• {b}</div>
+          ))}
+        </div>
+      )}
+      {mutation.isError && !serverBlockers && (
+        <p className="text-xs text-red-400 mt-2">Release failed. Check blockers and try again.</p>
+      )}
+    </Overlay>
+  );
+}
 
 // ── Modal: Record Inspection Completion ────────────────────────────────────
 
@@ -434,6 +647,7 @@ function DiscrepancyRow({ disc, showHistory }: { disc: Discrepancy; showHistory?
 export default function AircraftMaintenance() {
   const { aircraftId } = useParams<{ aircraftId: string }>();
   const id = Number(aircraftId);
+  const [releaseOpen, setReleaseOpen] = useState(false);
 
   const { data: ac, isLoading: acLoading } = useQuery({
     queryKey: ["aircraft-detail", id],
@@ -465,6 +679,11 @@ export default function AircraftMaintenance() {
   const openDiscs = (allDiscrepancies ?? []).filter((d) => d.work_status !== "CLOSED");
   const closedDiscs = (allDiscrepancies ?? []).filter((d) => d.work_status === "CLOSED");
   const statusDrift = ac.status !== ac.computed_status;
+  const overdueDowning = (inspections ?? []).filter(
+    (i) => i.is_overdue && i.inspection_type.is_downing_when_overdue
+  );
+  const releaseBlockers = collectReleaseBlockers(openDiscs, overdueDowning);
+  const releaseReady = releaseBlockers.length === 0;
 
   return (
     <div className="space-y-5">
@@ -529,13 +748,64 @@ export default function AircraftMaintenance() {
 
         {statusDrift && (
           <div className="mt-3 p-2.5 bg-yellow-950/30 border border-yellow-800/40 rounded text-xs text-yellow-300">
-            Status drift detected: aircraft is stamped{" "}
-            <span className="font-semibold">{ac.status}</span> but computed status is{" "}
-            <span className="font-semibold">{ac.computed_status}</span>. Review open discrepancies
-            and overdue inspections below.
+            Stamped vs. computed: line shows{" "}
+            <span className="font-semibold">{ac.status}</span> but system computes{" "}
+            <span className="font-semibold">{ac.computed_status}</span> from open discrepancies
+            and inspections. Update stamped status after QA signoff and release for flight.
           </div>
         )}
       </div>
+
+      {/* QA Release */}
+      <div
+        className={`card ${statusDrift ? "border-green-800/40 bg-green-950/10" : ""}`}
+      >
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="flex items-center gap-2">
+              <ShieldCheck size={18} className="text-green-400" />
+              QA Release
+            </h2>
+            <p className="text-sm text-slate-400 mt-1">
+              After QA signoff, release aircraft safe for flight and stamp line status to{" "}
+              <Badge variant={STATUS_VARIANT[ac.computed_status]}>{ac.computed_status}</Badge>
+            </p>
+          </div>
+          <button
+            onClick={() => setReleaseOpen(true)}
+            className="btn-primary text-sm flex items-center gap-1.5 shrink-0"
+          >
+            <ShieldCheck size={14} />
+            {statusDrift && releaseReady ? "Release for Flight" : "QA Release"}
+          </button>
+        </div>
+
+        {releaseBlockers.length > 0 ? (
+          <div className="mt-3 p-2.5 bg-red-950/20 border border-red-800/30 rounded text-xs text-red-300 space-y-1">
+            <div className="font-medium text-red-400">Not safe for flight — resolve:</div>
+            {releaseBlockers.map((b) => (
+              <div key={b}>• {b}</div>
+            ))}
+          </div>
+        ) : statusDrift ? (
+          <div className="mt-3 p-2.5 bg-green-950/20 border border-green-800/30 rounded text-xs text-green-300">
+            Ready for QA release — stamped {ac.status} will update to {ac.computed_status}.
+          </div>
+        ) : (
+          <div className="mt-3 text-xs text-slate-500">
+            Stamped status matches computed. QA release available when maintenance state changes.
+          </div>
+        )}
+      </div>
+
+      {releaseOpen && (
+        <QaReleaseModal
+          ac={ac}
+          openDiscs={openDiscs}
+          inspections={inspections ?? []}
+          onClose={() => setReleaseOpen(false)}
+        />
+      )}
 
       {/* B — Inspections */}
       <div className="card">

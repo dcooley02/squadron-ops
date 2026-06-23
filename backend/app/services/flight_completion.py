@@ -36,8 +36,9 @@ def _upsert_currency_typed(
         Currency.currency_type_id == currency_type.id,
     ).first()
     if existing:
-        existing.last_event_date = event_date
-        existing.expires_date = expires
+        if event_date >= existing.last_event_date:
+            existing.last_event_date = event_date
+            existing.expires_date = expires
     else:
         db.add(Currency(
             person_id=person_id,
@@ -118,6 +119,8 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     else:
         sortie.departure_location = payload.departure_location
         sortie.arrival_location   = payload.arrival_location
+    if payload.flight_mode is not None:
+        sortie.flight_mode = payload.flight_mode
     sortie.is_complete = True
 
     flight_date = payload.actual_takeoff_time.date()

@@ -1,0 +1,490 @@
+================================================================================
+SQUADRON OPS v2 — PROJECT SUMMARY
+================================================================================
+Last updated: June 2026
+Repository: squadron-ops (forked from hsc-squadron-ops v1.0-demo)
+Community focus: HSC / MH-60S (single-squadron demo; multi-squadron deferred)
+
+================================================================================
+1. PURPOSE AND THESIS
+================================================================================
+
+Squadron Ops is a naval aviation operations platform intended to replace or
+outperform legacy squadron tools (OOMA for maintenance, SHARP for training/
+readiness) with a modern, integrated web application.
+
+The thesis: one builder can produce a working end-to-end artifact that a Naval
+Aviator, maintainer, or program manager recognizes as credible in their domain.
+The demo prioritizes believable data, visible cascades (flight → currency →
+readiness → maintenance), and polished UX over production hardening.
+
+Target audience for the demo is intentionally broad (squadron CO, SDO, maint
+control, TYCOM, NAVAIR PM, investors). The roadmap assumes the highest-
+knowledge viewer in the room.
+
+================================================================================
+2. ORIGIN AND VERSION HISTORY
+================================================================================
+
+- v1.0-demo: HSC-specific prototype at github.com/dcooley02/hsc-squadron-ops
+  (tag v1.0-demo). Still runnable on localhost:5173 / :8000.
+- v2 (this repo): Expanded scope, demo-first build order, richer data model,
+  flight-logging cascade, maintenance slice, TV boards, audit log.
+- Fork date: 2026-05-11 (per KNOWN_ISSUES.md).
+
+================================================================================
+3. TECHNOLOGY STACK
+================================================================================
+
+Backend
+  - Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic v2
+  - PostgreSQL 16 (Docker Compose on host port 5433)
+  - Alembic migrations
+  - Uvicorn dev server on port 8001
+
+Frontend
+  - React 18, TypeScript (strict), Vite
+  - Tailwind CSS, shadcn/ui patterns, lucide-react icons
+  - TanStack Query for data fetching
+  - Dev server on port 5174 (5173 if v1 also running)
+
+Infrastructure
+  - docker-compose.yml: PostgreSQL only (app runs locally, not containerized)
+  - CORS allows localhost:5173 and :5174
+
+Auth
+  - Planned JWT + RBAC; NOT implemented. Demo runs open (no login).
+
+================================================================================
+4. ARCHITECTURE
+================================================================================
+
+Three-layer backend (invariant — do not break):
+  SQLAlchemy models  →  Pydantic schemas  →  FastAPI route handlers
+
+Business logic lives in backend/app/services/, not in route handlers.
+
+Frontend pattern:
+  Pages in frontend/src/pages/
+  Reusable components in frontend/src/components/
+  API client and types in frontend/src/lib/api.ts
+  TanStack Query with ~30s stale time
+
+Status color convention:
+  Green = good (FMC, current currency)
+  Yellow = warning (PMC, expiring, stamped vs computed drift)
+  Red = action needed (NMC*, expired, DOWNING discrepancies)
+
+Timestamps: stored UTC, displayed in local time on frontend.
+
+Per-crewmember flight hours live on FlightLog, not sortie-level aggregates.
+
+================================================================================
+5. REPOSITORY LAYOUT
+================================================================================
+
+backend/
+  app/
+    api/           REST route handlers (persons, aircraft, sorties, logging,
+                   maintenance, scheduling, syllabus, currency, dashboard,
+                   tmr_codes, audit)
+    models/        SQLAlchemy ORM (single models.py)
+    schemas/       Pydantic request/response models
+    services/      Business logic (cascade, scheduling, maintenance, logbook)
+    middleware/    Audit log middleware
+  alembic/         Database migrations
+  seed.py          Full demo dataset wipe + reseed
+
+frontend/
+  src/
+    pages/         Top-level routed views (18 page components)
+    components/    Shared UI (Layout, Sidebar, Badge, Loading, modals, etc.)
+    board/         Fullscreen TV board views (ops, maint, readiness)
+    lib/           api.ts, dates, utilities
+
+Docs
+  README.md        Quickstart
+  ROADMAP.md       Capability build order and scope commitments
+  AGENTS.md        Agent/developer guide and domain conventions
+  KNOWN_ISSUES.md  Technical debt and carried-over v1 issues
+  PROJECT_SUMMARY.txt  This file
+
+================================================================================
+6. DATA MODEL (DATABASE ENTITIES)
+================================================================================
+
+Core operations
+  Person              Squadron members (pilots, aircrew, staff roles)
+  Aircraft            MH-60S airframes (BuNo, side number, hours, stamped status)
+  Sortie              Scheduled or completed flight events
+  FlightLog           Per-crewmember sortie participation and hours
+  SortieLeg           Multi-leg sortie support
+  SortieTaskCredit    CBR task grades per crewmember per sortie
+  SortieTmrCode       TMR code hours attached to sorties
+  TmrCode             TMR code catalog
+
+Readiness and training
+  Qualification       Non-perishable quals (HAC, H2P, NVG, FCP, NSI, INSTR, etc.)
+  Currency            Perishable currencies per person
+  CurrencyType        Wing Table B-2 catalog (table-driven)
+  CurrencyApplicability  Who each currency type applies to
+  SyllabusEvent       SWTP event definitions (COMHELSEACOMBATWING 3502.8 codes)
+  Gradecard           Training gradesheets
+  GradecardLineItem   Syllabus line items on events
+  GradecardLineItemResult  Per-student grades on line items
+  CbrTaskOption       Capability-based readiness task library (scaffolding)
+
+Maintenance (NAMP / 4790-inspired slice)
+  Discrepancy         Open/closed maintenance issues (MAF, JCN, work status)
+  InspectionType      Recurring inspection definitions (7 types)
+  AircraftInspection  Per-aircraft inspection tracking and due dates
+
+Safety and audit
+  SafetyReport        Sortie-linked safety/hazard reports
+  InstrumentApproach  Per-crew instrument approaches on flight logs
+  AuditLog            HTTP audit trail for consequential API calls
+
+Aircraft status codes
+  FMC   Fully Mission Capable
+  PMC   Partially Mission Capable
+  NMC   Non-Mission Capable
+  NMCM  NMC for Maintenance
+  NMCS  NMC for Supply
+
+Stamped vs computed status
+  Aircraft.status           Line-maintainer stamped value (what brief/OOMA shows)
+  computed_status (API)     Derived from open discrepancies + overdue inspections
+  Intentional drift in seed: aircraft 614 and 615 stamped FMC but computed
+  PMC/NMCM for maintainer workflow demos.
+
+Maintenance terminology (use in UI — NOT "RTS", which means Ready to Strike):
+  QA signoff, QA release, release for flight, safe for flight
+
+================================================================================
+7. SEED DATA (python seed.py)
+================================================================================
+
+Run from backend/:  python seed.py  (wipes and repopulates)
+
+Typical seeded scale:
+  - 8 MH-60S aircraft (side numbers 610–617)
+  - ~12 pilots, 8 aircrew, staff (SDO, training officer, maint control, etc.)
+  - Wing Table B-2 currency types with ~88% current / ~8% expiring / ~4% expired
+  - SWTP syllabus events across PILOT_CORE, PILOT_AMCM, AIRCREW tracks
+  - 90+ historical sorties with flight logs, task credits, approaches
+  - Future scheduled sorties including today's flights for dashboard "Next 24h"
+  - Discrepancies aligned to aircraft status + 2 drift demo cases
+  - 7 inspection types × 8 aircraft inspection rows
+  - Historical gradecards, safety reports, qualifications
+
+Aircraft status mix (stamped):
+  4 FMC, 2 FMC (drift demos), 1 PMC, 1 NMCM
+  ~50% computed FMC after discrepancy logic
+
+================================================================================
+8. BACKEND API SURFACE (prefix /api unless noted)
+================================================================================
+
+Health
+  GET /health
+
+Persons
+  GET /persons
+  GET /persons/{id}                    Detail with quals and currencies
+
+Aircraft
+  GET /aircraft                        List with computed_status
+  GET /aircraft/{id}                   Detail with open discrepancies
+
+Sorties
+  GET /sorties
+  GET /sorties/{id}                    Detail with flight logs, legs, TMR
+
+Dashboard
+  GET /dashboard/summary               Squadron rollup metrics
+
+Scheduling
+  GET /scheduling/sorties/upcoming
+  GET /scheduling/sorties/{id}/eligible-crew
+  GET /scheduling/sorties/{id}/fitness
+  POST /scheduling/sorties
+  POST /scheduling/sorties/{id}/crew
+  DELETE /scheduling/sorties/{id}/crew/{flight_log_id}
+  DELETE /scheduling/sorties/{id}
+
+Flight logging
+  POST /logging/sorties/{id}/complete  Full sortie completion cascade
+  POST /logging/unscheduled            Ad-hoc sortie creation + complete
+  GET /logging/tasks/options           CBR task options
+  GET /logging/persons/{id}/training-jacket
+  GET /logging/aircraft/{id}/adb       Aircraft discrepancy book view
+  GET/POST /logging/safety/reports
+  GET /logging/logbook/{id}            Digital logbook
+  GET /logging/logbook/{id}/pdf        PDF export (WeasyPrint)
+
+Maintenance
+  GET /maintenance/inspections/types
+  GET /maintenance/aircraft/{id}/inspections
+  GET /maintenance/aircraft/{id}/discrepancies
+  PATCH /maintenance/discrepancies/{id}
+  PATCH /maintenance/aircraft/{id}/inspections/{insp_id}
+  POST /maintenance/aircraft/{id}/qa-release   QA release / safe for flight
+
+Syllabus / gradecards
+  GET /syllabus/events
+  GET /syllabus/events/{code}/template
+  GET /syllabus/events/{id}/instructors
+  POST /syllabus/gradecards, /gradecards/blank
+  GET/PATCH /syllabus/gradecards/{id}
+  GET /syllabus/persons/{id}/gradecards
+
+Currency
+  GET /currency/types
+  GET /currency/types/applicable-to/{person_id}
+  GET /currency/types/{code}
+
+TMR codes
+  GET /tmr-codes
+
+Audit
+  GET /audit                           Filterable audit log
+
+================================================================================
+9. KEY BACKEND SERVICES
+================================================================================
+
+flight_completion.py   complete_sortie() cascade: flight logs, currencies,
+                       aircraft hours, syllabus credits, discrepancies, safety
+currency_renewal_rules.py / currency_applicability.py
+scheduling.py          Crew eligibility, fitness checks, NIGHT_NVD alignment
+aircraft_status.py     compute_status() from discrepancies + inspections
+aircraft_detail.py     Build AircraftDetail responses
+qa_release.py          QA release: close discs, validate blockers, stamp status
+logbook.py             Logbook aggregation and landing deduplication
+logbook_pdf.py         PDF generation
+gradecards.py          Gradesheet logic
+jcn.py                 Job Control Number generation (CNAF M-4790.2)
+
+================================================================================
+10. FRONTEND PAGES AND ROUTES
+================================================================================
+
+App shell (sidebar navigation, localhost:5174)
+
+  /                          Dashboard — readiness metrics, next 24h sorties,
+                               stamped vs computed drift alert
+  /crew                      Crew roster
+  /crew/:id                  Crew detail — quals, currencies, training jacket link
+  /aircraft                  Aircraft list (flight ops view)
+  /aircraft/:id              Aircraft detail — hours, status, open discrepancies
+  /sorties                   Sortie list
+  /sorties/:id               Sortie detail — crew, hours from flight logs, legs
+  /sorties/:id/complete      Complete Sortie — per-crew hours, mission profile,
+                               discrepancies, safety reports, task credits
+  /logbook/:personId         Digital logbook with PDF export
+  /schedule                  Schedule builder — create sorties, assign crew,
+                               eligibility/fitness hints
+  /training                  Training hub — syllabus, gradecards
+  /training/gradecard/:id    Gradecard detail
+  /training/gradecard/:id/fill  Fill gradesheet
+  /maintenance               Maintenance overview — FMC/PMC/NMC counts (computed),
+                               drift banner, phase forecast
+  /maintenance/:aircraftId   Aircraft maintenance — inspections, discrepancies,
+                               QA release workflow
+  /board                     TV board index
+  /admin                     Admin — audit log viewer
+
+Fullscreen TV boards (no sidebar)
+  /board/ops                 Operations board
+  /board/maint               Maintenance board
+  /board/readiness           Readiness board
+
+================================================================================
+11. WORKING FEATURES (CURRENT DEMO STATE)
+================================================================================
+
+Operations and scheduling
+  - Squadron dashboard with aircraft readiness, currency warnings, upcoming sorties
+  - Sortie scheduling with crew assignment
+  - Scheduling intelligence: eligible crew ranking, fitness checks (quals, currency)
+  - Sortie detail with multi-leg and TMR code display
+
+Flight logging and cascade (Phase B — verified)
+  - Complete Sortie UI: per-crew night/NVG/instrument hours, role hours by position
+  - "Apply mission profile to all crew" bulk fill
+  - flight_mode in completion payload
+  - Cascade on complete: currency renewal (e.g. NIGHT_NVD on NVG flights),
+    aircraft hour increment, task credits, discrepancies, safety reports
+  - Training jacket per person
+  - Digital logbook with PDF export
+  - Instrument approaches per crewmember
+  - Per-crew landing counts on flight logs
+
+Maintenance (Phase A + C — demo-ready slice)
+  - Computed vs stamped aircraft status with drift messaging
+  - Discrepancy tracking (MAF numbers, severity, work status AWP/AWM/IN_WORK,
+    JCN, type WO codes)
+  - Inspection tracking with overdue detection and completion recording
+  - QA release workflow: POST qa-release stamps line status after QA signoff;
+    blocked when DOWNING discs remain, downing inspection overdue, or NMC*
+  - Phase interval / hours-to-phase forecast on maintenance pages
+
+Training
+  - SWTP syllabus event catalog (realistic HSC codes)
+  - Gradecard create, fill, view
+  - CBR task option library (scaffolding — full Appendix D not yet seeded)
+
+Readiness
+  - Per-person qualifications and Wing Table B-2 currencies
+  - Currency type catalog with applicability rules
+  - Dashboard currency warning counts
+  - Readiness TV board (partial — WTM T-rating math NOT implemented)
+
+Governance
+  - HTTP audit middleware logging consequential API actions
+  - Admin page to browse audit log
+
+Demo credibility (Phase A)
+  - Currency seed distribution (~88% current, not wall of red)
+  - Aircraft status mix with intentional drift cases (614 PMC, 615 NMCM)
+  - Today's sorties on dashboard "Next 24 Hours"
+
+================================================================================
+12. SORTIE COMPLETION CASCADE (SPINE OF THE APP)
+================================================================================
+
+When POST /logging/sorties/{id}/complete runs:
+
+  1. Updates sortie times, completion flag, flight mode
+  2. Writes/updates FlightLog rows per crewmember (hours, landings, approaches)
+  3. Renews applicable currencies (only advances if event_date >= last_event_date)
+  4. Increments aircraft total_airframe_hours
+  5. Records SortieTaskCredit grades
+  6. Files Discrepancy records if provided
+  7. Creates SafetyReport records if provided
+  8. Attaches SortieTmrCode hours
+
+Observable demo path:
+  Schedule/complete NVG sortie → crew NIGHT_NVD currency extends → aircraft
+  hours increment → any filed discrepancy appears on aircraft maintenance page.
+
+================================================================================
+13. QA RELEASE WORKFLOW (MAINTENANCE)
+================================================================================
+
+Problem: Stamped status (Aircraft.status) can lag computed status when open
+discrepancies change but line paperwork has not been updated.
+
+Solution: Maintainer completes work → QA signoff → QA release:
+  - Optional: close selected discrepancies with corrective action
+  - Validates blockers (open DOWNING, overdue downing inspection, NMC*)
+  - Sets aircraft.status = computed_status
+  - Clears manual_status_override
+  - Appends QA notes to aircraft.notes
+
+UI: Maintenance page drift banner → aircraft maintenance detail → QA Release
+card/modal → "Release for Flight" button.
+
+================================================================================
+14. ROADMAP STATUS — WHAT IS NOT DONE
+================================================================================
+
+Current roadmap batch: #1 Logbook (cascade verification largely complete;
+Batch 2 logging entry points partially done).
+
+Not implemented (committed future work per ROADMAP.md):
+
+  #2 Readiness Reports — Full WTM T-1/T-2/T-3 math per CHSCWPINST 3500.1F
+      Appendix D; capability area rollups; exportable readiness brief PDF
+
+  #3 Maintenance deep-dive — Full CNAF M-4790.2 chain (complete MAF/WO model,
+      work center routing, BCM, ASR/MSR logbook, release projections)
+
+  #4 Training — Board scheduling, instructor pairing, SHARP-style gradesheet PDF
+
+  #5 SDO tools — Schedule publishing, ATO, watchbill, day-of ops view
+
+  #6 Auth and polish — JWT, RBAC by role, password reset, empty-state pass
+
+  #7 Auto-schedule — Assisted (not automatic) crew ranking / week builder
+
+  #8 Multi-squadron — Deferred pending stakeholder conversation
+
+Non-goals for v2: classified data, mobile-first, real-time co-editing, Navy
+system integration.
+
+================================================================================
+15. KNOWN ISSUES AND TECHNICAL DEBT
+================================================================================
+
+From KNOWN_ISSUES.md and development notes:
+
+  - No authentication or authorization
+  - No automated test suite
+  - HSC-specific syllabus/currency catalog (community templates later)
+  - datetime.utcnow() deprecation warnings in seed.py
+  - Readiness Board: 41 N+1 gradecard fetches (performance)
+  - Frontend tsc build has pre-existing strict-null errors in Admin.tsx,
+    CompleteSortie.tsx, SortieDetail.tsx (dev server runs; production build may fail)
+  - WTM T-rating math stubbed / not implemented
+  - Sim sortie (TOFT) currency credit rules not enforced
+  - Full 4790 configuration management deferred
+
+================================================================================
+16. HOW TO RUN LOCALLY
+================================================================================
+
+  docker compose up -d
+  cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8001
+  cd frontend && npm run dev
+
+  Frontend: http://localhost:5174
+  Backend:  http://localhost:8001
+  API docs: http://localhost:8001/docs
+
+  Reseed database:  cd backend && python seed.py
+
+  v1 demo (separate repo): http://localhost:5173 on ports 5173/8000
+
+================================================================================
+17. DOMAIN QUICK REFERENCE
+================================================================================
+
+Roles (planned RBAC): PILOT, AIRCREW, SDO, TRAINING_OFFICER, MAINT_CONTROL,
+                      CO_XO, ADMIN
+
+Crew positions (MH-60S): HAC, H2P, H2P_U, CREW_CHIEF, AIRCREW, AWS
+
+Discrepancy work status: OPEN, IN_WORK, AWP (awaiting parts), AWM, COMPLETED,
+                         CLOSED
+
+Discrepancy severity: MINOR, MAJOR, DOWNING
+
+Capability areas (CBR scaffolding): MOB, FSO, ASU, SOF, PR, STW, LOG, MIW
+
+Legacy currency codes (avoid in new logic): NVG, NIGHT_DL — use NIGHT_NVD from
+                                            CurrencyType catalog
+
+================================================================================
+18. DEMO READINESS ASSESSMENT (JUNE 2026)
+================================================================================
+
+External browser review rated the platform demo-ready for a 10-minute
+walkthrough. Core cascade (sortie completion → currency → maintenance status)
+works without critical errors.
+
+Recommended before stakeholder demo:
+  - Reseed database to restore drift cases on aircraft 614/615 if API testing
+    consumed them
+  - Walk through: complete sortie → verify currency on crew page → QA release
+    on drift aircraft → confirm dashboard counts update
+  - Avoid using "RTS" in conversation; say QA release / release for flight
+
+Suggested polish (not blockers):
+  - FMC empty state on maintenance page when all aircraft green
+  - Complete Sortie validation warnings (landing time, crew positions)
+  - Success toast after QA release
+
+================================================================================
+END OF DOCUMENT
+================================================================================

@@ -1,10 +1,20 @@
+import { useMemo } from "react";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { fetchDashboardSummary, fetchAircraft, fetchAircraftDetail, type AircraftDetail } from "../lib/api";
-import { Users, Plane, AlertTriangle, Calendar, Clock } from "lucide-react";
+import { format, parseISO, addHours, isAfter, isBefore } from "date-fns";
+import {
+  fetchDashboardSummary,
+  fetchAircraft,
+  fetchAircraftDetail,
+  fetchUpcomingSorties,
+  type AircraftDetail,
+  type SortieSummary,
+} from "../lib/api";
+import { Users, Plane, AlertTriangle, Calendar, Clock, ArrowRight } from "lucide-react";
 import MetricCard from "../components/MetricCard";
 import RateRing from "../components/RateRing";
 import Loading from "../components/Loading";
+import Badge from "../components/Badge";
 
 export default function Dashboard() {
   const { data, isLoading, error } = useQuery({
@@ -17,6 +27,11 @@ export default function Dashboard() {
     queryFn: () => fetchAircraft(),
   });
 
+  const { data: upcomingSorties } = useQuery({
+    queryKey: ["upcoming-sorties"],
+    queryFn: fetchUpcomingSorties,
+  });
+
   const detailQueries = useQueries({
     queries: (aircraftList ?? []).map((ac) => ({
       queryKey: ["aircraft-detail", ac.id],
@@ -24,6 +39,18 @@ export default function Dashboard() {
       enabled: !!aircraftList,
     })),
   });
+
+  const next24hSorties = useMemo(() => {
+    const now = new Date();
+    const cutoff = addHours(now, 24);
+    return (upcomingSorties ?? [])
+      .filter((s): s is SortieSummary & { takeoff_time: string } => {
+        if (!s.takeoff_time) return false;
+        const t = parseISO(s.takeoff_time);
+        return !isBefore(t, now) && !isAfter(t, cutoff);
+      })
+      .sort((a, b) => parseISO(a.takeoff_time).getTime() - parseISO(b.takeoff_time).getTime());
+  }, [upcomingSorties]);
 
   if (isLoading) return <Loading message="Loading squadron status..." />;
   if (error || !data) {
@@ -38,7 +65,6 @@ export default function Dashboard() {
     .map((q) => q.data)
     .filter(Boolean) as AircraftDetail[];
 
-  // Counts from computed_status (falls back to dashboard summary until details load)
   const fmcCount = details.length > 0
     ? details.filter((a) => a.computed_status === "FMC").length
     : data.aircraft_fmc_count;
@@ -50,8 +76,12 @@ export default function Dashboard() {
   const computedFmcRate = data.aircraft_total > 0
     ? (fmcCount / data.aircraft_total) * 100
     : 0;
+  const stampedFmcRate = data.aircraft_total > 0
+    ? (data.aircraft_fmc_count / data.aircraft_total) * 100
+    : 0;
 
-  const driftCount = details.filter((a) => a.status !== a.computed_status).length;
+  const driftingAircraft = details.filter((a) => a.status !== a.computed_status);
+  const driftCount = driftingAircraft.length;
 
   const expiringSoon = data.currencies_expiring_14d_count;
   const expired = data.currencies_expired_count;
@@ -61,9 +91,55 @@ export default function Dashboard() {
       <div>
         <h1>Squadron Dashboard</h1>
         <p className="text-sm text-slate-400 mt-1">
-          Real-time readiness across personnel, aircraft, and currency
+          Morning brief — personnel, aircraft readiness, and today&apos;s schedule
         </p>
       </div>
+
+      {/* Today's schedule — SDO quick-look */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
+            Next 24 Hours
+          </h2>
+          <Link
+            to="/schedule"
+            className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1"
+          >
+            Full schedule <ArrowRight size={12} />
+          </Link>
+        </div>
+        {next24hSorties.length === 0 ? (
+          <div className="card text-sm text-slate-500 py-4">
+            No sorties scheduled in the next 24 hours.
+          </div>
+        ) : (
+          <div className="card divide-y divide-slate-800 p-0 overflow-hidden">
+            {next24hSorties.map((s) => (
+              <Link
+                key={s.id}
+                to={`/sorties/${s.id}`}
+                className="flex items-center gap-4 px-4 py-3 hover:bg-slate-800/40 transition-colors"
+              >
+                <div className="text-sm font-mono text-slate-300 w-16 shrink-0">
+                  {format(parseISO(s.takeoff_time), "HHmm")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-slate-100 truncate">
+                    {s.event_code ?? s.event_type ?? "Sortie"}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {s.event_type ?? "Mission"}
+                    {s.duration_hours != null && ` · ${s.duration_hours.toFixed(1)} hr`}
+                  </div>
+                </div>
+                <div className="text-xs text-slate-400 shrink-0">
+                  {s.aircraft_side_number ? `#${s.aircraft_side_number}` : "TBD acft"}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Personnel section */}
       <section className="space-y-3">
@@ -86,9 +162,18 @@ export default function Dashboard() {
         <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
           Aircraft Readiness
         </h2>
+        <p className="text-xs text-slate-500">
+          <span className="text-slate-400">Computed</span> reflects open discrepancies and
+          inspections. <span className="text-slate-400">Stamped</span> is the line-maintainer
+          status until QA release updates it.
+        </p>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <div className="card flex items-center justify-center lg:row-span-1">
-            <RateRing rate={computedFmcRate} label="FMC Rate" />
+          <div className="card flex flex-col items-center justify-center gap-2 lg:row-span-1 py-6">
+            <RateRing rate={computedFmcRate} label="Computed FMC" />
+            <p className="text-xs text-slate-500">
+              Stamped: {data.aircraft_fmc_count}/{data.aircraft_total} FMC
+              {" "}({stampedFmcRate.toFixed(0)}%)
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3 lg:col-span-2">
             <MetricCard
@@ -97,23 +182,23 @@ export default function Dashboard() {
               icon={<Plane size={16} />}
             />
             <MetricCard
-              label="Fully Mission Capable"
+              label="Computed FMC"
               value={fmcCount}
               variant="good"
             />
             <div className="col-span-2 grid grid-cols-3 gap-3">
               <MetricCard
-                label="Partially Mission Capable"
+                label="Computed PMC"
                 value={pmcCount}
                 variant={pmcCount > 0 ? "warning" : "default"}
               />
               <MetricCard
-                label="NMCM (Maintenance)"
+                label="Computed NMCM"
                 value={nmcmCount}
                 variant={nmcmCount > 0 ? "danger" : "default"}
               />
               <MetricCard
-                label="NMCS (Supply)"
+                label="Computed NMCS"
                 value={nmcsCount}
                 variant={nmcsCount > 0 ? "danger" : "default"}
               />
@@ -131,13 +216,33 @@ export default function Dashboard() {
         )}
         {driftCount > 0 && (
           <Link to="/maintenance" className="block">
-            <div className="card border-yellow-700/40 bg-yellow-950/20 flex items-center gap-3 py-3 hover:border-yellow-600/60 transition-colors cursor-pointer">
-              <AlertTriangle size={16} className="text-yellow-400 shrink-0" />
-              <span className="text-sm text-yellow-300">
-                {driftCount} aircraft with status drift — stamped status doesn't match computed
-                reality
-              </span>
-              <span className="ml-auto text-xs text-yellow-500">View in Maintenance →</span>
+            <div className="card border-yellow-700/40 bg-yellow-950/20 space-y-2 py-3 hover:border-yellow-600/60 transition-colors cursor-pointer">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={16} className="text-yellow-400 shrink-0" />
+                <span className="text-sm text-yellow-300">
+                  Stamped vs. computed — {driftCount} aircraft awaiting QA release
+                </span>
+                <span className="ml-auto text-xs text-yellow-500 shrink-0">Maintenance →</span>
+              </div>
+              <p className="text-xs text-yellow-300/70 pl-7">
+                Open discrepancies changed computed readiness; stamped status has not been updated
+                yet. This is expected until QA signoff and release for flight.
+              </p>
+              <div className="pl-7 flex flex-wrap gap-2">
+                {driftingAircraft.map((ac) => (
+                  <span
+                    key={ac.id}
+                    className="text-xs text-yellow-200/80 flex items-center gap-1.5"
+                  >
+                    <span className="font-mono">{ac.side_number ?? ac.bureau_number}</span>
+                    <Badge variant="neutral">{ac.status}</Badge>
+                    <span className="text-slate-500">→</span>
+                    <Badge variant={ac.computed_status === "FMC" ? "success" : "warning"}>
+                      {ac.computed_status}
+                    </Badge>
+                  </span>
+                ))}
+              </div>
             </div>
           </Link>
         )}

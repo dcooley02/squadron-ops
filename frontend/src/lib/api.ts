@@ -292,14 +292,28 @@ export interface CbrTaskOption {
   is_active: boolean;
 }
 
+export interface FlightLogActualsPayload {
+  flight_log_id: number;
+  hours_logged: number;
+  night_hours?: number;
+  nvg_hours?: number;
+  actual_instrument_hours?: number;
+  sim_instrument_hours?: number;
+  total_hours?: number;
+  first_pilot_hours?: number;
+  copilot_hours?: number;
+  ac_commander_hours?: number;
+  mission_commander_hours?: number;
+  instructor_hours?: number;
+  special_crew_time_hours?: number;
+  syllabus_event_completed?: string | null;
+}
+
 export interface SortieCompletePayload {
   actual_takeoff_time: string;
   actual_land_time: string;
   duration_hours: number;
-  day_hours: number;
-  night_hours: number;
-  nvg_hours: number;
-  instrument_hours: number;
+  flight_mode?: "LIVE" | "SIM_TOFT";
   debrief_notes?: string | null;
   rounds_fired_20mm?: number | null;
   ugr_fired?: number | null;
@@ -316,7 +330,7 @@ export interface SortieCompletePayload {
   amns_ntrs?: number | null;
   strafe_dry_profiles_day?: number | null;
   strafe_dry_profiles_night?: number | null;
-  flight_log_actuals: Array<{ flight_log_id: number; hours_logged: number }>;
+  flight_log_actuals: FlightLogActualsPayload[];
   task_credits?: Array<{
     task_code: string;
     person_ids: number[];
@@ -728,6 +742,28 @@ export const patchInspection = async (
 ): Promise<AircraftInspection> => {
   const { data } = await api.patch<AircraftInspection>(
     `/api/maintenance/aircraft/${aircraftId}/inspections/${inspectionId}`,
+    body
+  );
+  return data;
+};
+
+export interface QaReleasePayload {
+  qa_notes: string;
+  close_discrepancy_ids?: number[];
+  corrective_action?: string;
+}
+
+export interface QaReleaseError {
+  message: string;
+  blockers: string[];
+}
+
+export const qaRelease = async (
+  aircraftId: number,
+  body: QaReleasePayload
+): Promise<AircraftDetail> => {
+  const { data } = await api.post<AircraftDetail>(
+    `/api/maintenance/aircraft/${aircraftId}/qa-release`,
     body
   );
   return data;

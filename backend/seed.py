@@ -36,7 +36,7 @@ from app.models.models import (
     Sortie, FlightLog, Discrepancy, CbrTaskOption, SortieTaskCredit, SafetyReport,
     CurrencyType, CurrencyApplicability,
     InspectionType, AircraftInspection,
-    SortieLeg, InstrumentApproach,
+    SortieLeg, InstrumentApproach, SortieTmrCode, TmrCode, AuditLog,
     Role, CrewPosition, AircraftStatus, DiscrepancySeverity, DiscrepancyWorkStatus,
     FlightMode, CapabilityArea, TaskGrade, CrewScope,
     SyllabusLevel, SyllabusStage, SyllabusTrack, EventVenue,
@@ -627,13 +627,18 @@ def seed_currency_types(db):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def wipe(db):
+    db.query(AuditLog).delete()
     db.query(GradecardLineItemResult).delete()
     db.query(Gradecard).delete()
     db.query(SortieTaskCredit).delete()
+    db.query(InstrumentApproach).delete()
+    db.query(SortieTmrCode).delete()
     db.query(Discrepancy).delete()
     db.query(SafetyReport).delete()
     db.query(FlightLog).delete()
+    db.query(SortieLeg).delete()
     db.query(Sortie).delete()
+    db.query(TmrCode).delete()
     db.query(AircraftInspection).delete()
     db.query(InspectionType).delete()
     db.query(GradecardLineItem).delete()
@@ -652,12 +657,13 @@ def wipe(db):
 # Aircraft
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Stamped statuses: 4 true FMC, 2 FMC with intentional drift (computed PMC/NMCM),
+# 1 PMC, 1 NMCM — targets ~50% computed FMC with 2 drift demos.
 _AC_STATUSES = [
-    AircraftStatus.FMC, AircraftStatus.FMC, AircraftStatus.FMC,
+    AircraftStatus.FMC, AircraftStatus.FMC, AircraftStatus.FMC, AircraftStatus.FMC,
     AircraftStatus.FMC, AircraftStatus.FMC,
     AircraftStatus.PMC,
     AircraftStatus.NMCM,
-    AircraftStatus.NMCS,
 ]
 
 
@@ -827,7 +833,15 @@ def seed_currencies(db, persons, currency_types=None):
             continue
         applicable = currencies_for_person(person, db)
         for ct in applicable:
-            days_ago = random.randint(0, int(ct.periodicity_days * 1.5))
+            # Demo posture: ~88% current, ~8% expiring within 14d, ~4% lapsed.
+            roll = random.random()
+            if roll < 0.88:
+                days_ago = random.randint(0, max(0, int(ct.periodicity_days * 0.65)))
+            elif roll < 0.96:
+                days_until_expire = random.randint(1, 14)
+                days_ago = max(0, ct.periodicity_days - days_until_expire)
+            else:
+                days_ago = ct.periodicity_days + random.randint(5, 45)
             last = TODAY - timedelta(days=days_ago)
             expires = last + timedelta(days=ct.periodicity_days)
             rows.append(Currency(
@@ -985,7 +999,8 @@ def seed_aircraft_inspections(db, aircraft_list, inspection_types):
                 days_ago = it.periodicity_days + overdue_by
                 overdue_picked = True
             else:
-                days_ago = random.randint(0, max(1, it.periodicity_days // 3))
+                # Keep calendar inspections comfortably current for flyable aircraft.
+                days_ago = random.randint(0, max(1, it.periodicity_days // 5))
             last_date = TODAY - timedelta(days=days_ago)
             next_date = last_date + timedelta(days=it.periodicity_days)
             db.add(AircraftInspection(
@@ -1322,8 +1337,13 @@ _CLOSED = [
 
 
 def seed_discrepancies(db, aircraft_list):
-    fmc_aircraft = [ac for ac in aircraft_list if ac.status == AircraftStatus.FMC]
-    minor_two    = random.sample(fmc_aircraft, min(2, len(fmc_aircraft)))
+    """
+    Open discrepancies aligned with stamped status and two intentional drift cases:
+    aircraft_list[4] stamped FMC + open MAJOR → computed PMC;
+    aircraft_list[5] stamped FMC + open DOWNING → computed NMCM.
+    """
+    drift_pmc_ac = aircraft_list[4]
+    drift_nmcm_ac = aircraft_list[5]
     maf_counter  = 1
     count_by_sev = {"MINOR": 0, "MAJOR": 0, "DOWNING": 0}
 
@@ -1353,20 +1373,18 @@ def seed_discrepancies(db, aircraft_list):
         count_by_sev[sev.value] += 1
 
     for ac in aircraft_list:
-        if ac.status == AircraftStatus.NMCM:
-            desc, sys, ws = random.choice(_NMCM)
+        if ac == drift_pmc_ac:
+            desc, sys, ws = _PMC[0]
+            _add(ac, desc, sys, DiscrepancySeverity.MAJOR, ws)
+        elif ac == drift_nmcm_ac:
+            desc, sys, ws = _NMCM[0]
             _add(ac, desc, sys, DiscrepancySeverity.DOWNING, ws)
-        elif ac.status == AircraftStatus.NMCS:
-            desc, sys, ws = random.choice(_NMCS)
+        elif ac.status == AircraftStatus.NMCM:
+            desc, sys, ws = random.choice(_NMCM)
             _add(ac, desc, sys, DiscrepancySeverity.DOWNING, ws)
         elif ac.status == AircraftStatus.PMC:
             desc, sys, ws = random.choice(_PMC)
-            # ~20% chance to escalate PMC MAJOR to DOWNING for demo variety
-            sev = DiscrepancySeverity.DOWNING if random.random() < 0.20 else DiscrepancySeverity.MAJOR
-            _add(ac, desc, sys, sev, ws)
-        elif ac in minor_two:
-            desc, sys, ws = random.choice(_MINOR)
-            _add(ac, desc, sys, DiscrepancySeverity.MINOR, ws)
+            _add(ac, desc, sys, DiscrepancySeverity.MAJOR, ws)
 
     # Historical closed discrepancies spread across all aircraft
     closed_per_ac = 2
@@ -1590,7 +1608,7 @@ def seed_historical_gradecards(db, all_logs):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list):
-    """9 planned sorties spread over the next 6 days."""
+    """Planned sorties for today through the next 6 days."""
     from app.models.models import Currency
 
     fmc    = [ac for ac in aircraft_list if ac.status == AircraftStatus.FMC]
@@ -1598,6 +1616,7 @@ def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list)
     nmcm   = next((ac for ac in aircraft_list if ac.status == AircraftStatus.NMCM), fmc[0])
     pmc_ac = pmc[0] if pmc else fmc[0]
 
+    day0 = TODAY
     day1 = TODAY + timedelta(days=1)
     day2 = TODAY + timedelta(days=2)
     day3 = TODAY + timedelta(days=3)
@@ -1609,7 +1628,7 @@ def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list)
     for pilot in hac_pilots:
         cur = db.query(Currency).filter(
             Currency.person_id == pilot.id,
-            Currency.currency_code == "NVG",
+            Currency.currency_code == "NIGHT_NVD",
             Currency.expires_date >= day2,
             Currency.expires_date <= day2 + timedelta(days=5),
         ).first()
@@ -1651,6 +1670,16 @@ def seed_future_sorties(db, aircraft_list, hac_pilots, all_pilots, aircrew_list)
             log_count += 1
         sortie_count += 1
         return s
+
+    h0 = _hac(0); p0 = _h2p({h0.id}, 0); c0 = _cc(0)
+    _add(day0, 9,  "PROFICIENCY", None, fmc[0], 1.5, 0.0, 0.0, 0.0, 1.5,
+         "Morning proficiency — day VFR pattern and deck-landing reps.",
+         [(h0, CrewPosition.HAC), (p0, CrewPosition.H2P), (c0, CrewPosition.CREW_CHIEF)])
+
+    h0b = _hac(1); u0b = _h2p_u(1)
+    _add(day0, 14, "INTRO", "P201", fmc[1], 2.0, 0.0, 0.0, 0.0, 2.0,
+         "P201 intro syllabus event — systems and weapons brief to follow.",
+         [(h0b, CrewPosition.HAC), (u0b, CrewPosition.H2P_U)])
 
     h1 = _hac(0); u1 = _h2p_u(0); c1 = _cc(0)
     _add(day1, 9,  "INTRO", "P200", fmc[0], 2.0, 0.0, 0.0, 0.0, 2.0,
