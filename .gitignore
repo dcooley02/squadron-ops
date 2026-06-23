@@ -17,5 +17,8 @@ build/
 .claude/
 .grok/
 
-# macOS Finder duplicate copies
-**/* 2.py
+# macOS Finder duplicate copies (e.g. "file 2.png", "module 3.py", "folder 2/")
+**/* 2
+**/* 3
+**/* 2.*
+**/* 3.*
