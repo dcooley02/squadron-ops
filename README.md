@@ -19,6 +19,28 @@ Built by a naval aviator to demonstrate credible domain modeling, full-stack eng
 
 ---
 
+## Screenshots
+
+Representative views from the local demonstration environment (synthetic HSC/MH-60S data).
+
+**Squadron Dashboard** — Morning brief with personnel counts, aircraft readiness, currency warnings, WTM capability strip, and next-24-hour sorties. One screen replaces the scattered spreadsheets and exports squadrons use today.
+
+![Squadron Ops dashboard with personnel metrics, aircraft readiness, currency warnings, and scheduled sorties](dashboard.png)
+
+**Maintenance Status** — Computed vs. stamped line status, phase and release forecasts, and aircraft awaiting QA release. Surfaces stamped/computed drift before an aircraft is released safe for flight.
+
+![Maintenance overview showing FMC counts, phase forecast, release projections, and aircraft awaiting QA release](maintenance.png)
+
+**WTM Readiness** — Squadron T-ratings by capability area with drill-down to per-pilot anchor tasks and contributing factors. Explainable readiness reporting aligned to Wing Training Manual structure.
+
+![WTM readiness page with capability area T-ratings and per-pilot drill-down for mobility readiness](readiness.png)
+
+**Squadron Snapshot (TV Board)** — Fullscreen ready-room display combining operational metrics, WTM ratings, currency status, and aircraft line status for daily stand-up.
+
+![Fullscreen squadron snapshot TV board with FMC rate, personnel counts, WTM strip, and aircraft status](snapshot.png)
+
+---
+
 ## Tech Stack
 
 | Layer | Technologies |
