@@ -1,7 +1,7 @@
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AlertTriangle, CheckCircle } from "lucide-react";
-import { fetchAircraft, fetchAircraftDetail, type AircraftDetail, type AircraftStatus } from "../lib/api";
+import { fetchAircraft, fetchAircraftDetail, fetchPhaseForecast, type AircraftDetail, type AircraftStatus } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
 
@@ -29,6 +29,12 @@ export default function Maintenance() {
       queryFn: () => fetchAircraftDetail(ac.id),
       enabled: !!aircraftList,
     })),
+  });
+
+  const { data: phaseForecast } = useQuery({
+    queryKey: ["phase-forecast"],
+    queryFn: () => fetchPhaseForecast(25),
+    enabled: !!aircraftList,
   });
 
   const allLoading = listLoading || detailQueries.some((q) => q.isLoading);
@@ -119,13 +125,22 @@ export default function Maintenance() {
       {/* D — Phase forecast */}
       <div className="card">
         <h2 className="mb-3">Phase Forecast</h2>
+        <p className="text-xs text-slate-500 mb-3">Assumes 25 flight hours/week per aircraft.</p>
         <div className="space-y-3">
-          {details
-            .map((ac) => ({ ac, hoursRemaining: ac.phase_interval - ac.hours_since_phase }))
-            .sort((a, b) => a.hoursRemaining - b.hoursRemaining)
-            .map(({ ac, hoursRemaining }) => (
-              <PhaseBar key={ac.id} ac={ac} hoursRemaining={hoursRemaining} />
-            ))}
+          {(phaseForecast ?? [])
+            .sort((a, b) => a.hours_to_phase - b.hours_to_phase)
+            .map((row) => {
+              const ac = details.find((d) => d.id === row.aircraft_id);
+              if (!ac) return null;
+              return (
+                <PhaseBar
+                  key={row.aircraft_id}
+                  ac={ac}
+                  hoursRemaining={row.hours_to_phase}
+                  projectedDate={row.projected_phase_date}
+                />
+              );
+            })}
         </div>
       </div>
     </div>
@@ -234,9 +249,11 @@ function AircraftCard({ ac }: { ac: AircraftDetail }) {
 function PhaseBar({
   ac,
   hoursRemaining,
+  projectedDate,
 }: {
   ac: AircraftDetail;
   hoursRemaining: number;
+  projectedDate?: string | null;
 }) {
   const pct = Math.min(100, (ac.hours_since_phase / ac.phase_interval) * 100);
   const barColor = pct >= 90 ? "bg-red-500" : pct >= 75 ? "bg-yellow-500" : "bg-green-500";
@@ -256,6 +273,9 @@ function PhaseBar({
           <span className={hoursRemaining < 50 ? "text-yellow-400" : "text-slate-400"}>
             {hoursRemaining.toFixed(0)}h remaining
           </span>
+          {projectedDate && (
+            <span className="text-slate-500"> · est. {projectedDate}</span>
+          )}
         </span>
       </div>
       <div className="h-2 bg-slate-800 rounded-full overflow-hidden">

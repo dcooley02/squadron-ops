@@ -1,17 +1,27 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle, ShieldCheck, Wrench } from "lucide-react";
+import { ArrowLeft, CheckCircle, Plus, ShieldCheck, Wrench } from "lucide-react";
 import { differenceInDays, parseISO } from "date-fns";
 import {
   fetchAircraftDetail,
   fetchAircraftInspections,
   fetchAircraftDiscrepancies,
+  fetchWorkCenters,
+  fetchWorkOrders,
+  fetchLogbook,
+  createDiscrepancy,
   patchDiscrepancy,
   patchInspection,
+  patchWorkOrder,
+  qaSignoffWorkOrder,
   qaRelease,
+  fetchReleaseForecast,
   type AircraftInspection,
   type Discrepancy,
+  type WorkOrder,
+  type WorkCenter,
+  type LogbookEntry,
   type AircraftStatus,
   type DiscrepancySeverity,
   type DiscrepancyWorkStatus,
@@ -604,7 +614,16 @@ function DiscrepancyRow({ disc, showHistory }: { disc: Discrepancy; showHistory?
               {disc.system_affected && (
                 <span className="text-xs text-slate-400 font-mono">{disc.system_affected}</span>
               )}
+              {disc.work_center_code && (
+                <span className="text-xs text-slate-500">WC {disc.work_center_code}</span>
+              )}
+              {disc.has_qa_signoff && (
+                <Badge variant="success" className="text-xs">QA signed</Badge>
+              )}
             </div>
+            {disc.reported_by_name && (
+              <div className="text-xs text-slate-500 mt-0.5">Reported by {disc.reported_by_name}</div>
+            )}
             <p className="text-sm text-slate-300 mt-1">{disc.description}</p>
             <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
               <span>Opened {formatDate(disc.opened_date)}</span>
@@ -646,12 +665,206 @@ function DiscrepancyRow({ disc, showHistory }: { disc: Discrepancy; showHistory?
   );
 }
 
+// ── Create discrepancy (line entry) ────────────────────────────────────────
+
+function CreateDiscrepancyModal({
+  aircraftId,
+  onClose,
+}: {
+  aircraftId: number;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const { data: centers } = useQuery({
+    queryKey: ["work-centers"],
+    queryFn: fetchWorkCenters,
+  });
+  const [description, setDescription] = useState("");
+  const [severity, setSeverity] = useState<DiscrepancySeverity>("MINOR");
+  const [system, setSystem] = useState("");
+  const [typeWo, setTypeWo] = useState("DM");
+  const [workCenterId, setWorkCenterId] = useState<number | "">("");
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      createDiscrepancy(aircraftId, {
+        description,
+        severity,
+        system_affected: system || undefined,
+        type_wo_code: typeWo,
+        work_center_id: workCenterId === "" ? undefined : workCenterId,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["aircraft-discrepancies", aircraftId] });
+      qc.invalidateQueries({ queryKey: ["aircraft-work-orders", aircraftId] });
+      qc.invalidateQueries({ queryKey: ["aircraft-logbook", aircraftId] });
+      qc.invalidateQueries({ queryKey: ["aircraft-detail", aircraftId] });
+      onClose();
+    },
+  });
+
+  return (
+    <Overlay onClose={onClose}>
+      <h3 className="text-base font-semibold mb-4">New Discrepancy</h3>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Description *</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm resize-none"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Severity</label>
+            <select
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value as DiscrepancySeverity)}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
+            >
+              <option value="MINOR">MINOR</option>
+              <option value="MAJOR">MAJOR</option>
+              <option value="DOWNING">DOWNING</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs text-slate-400 mb-1">Type WO</label>
+            <input
+              value={typeWo}
+              onChange={(e) => setTypeWo(e.target.value.toUpperCase().slice(0, 2))}
+              className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">System affected</label>
+          <input
+            value={system}
+            onChange={(e) => setSystem(e.target.value)}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-slate-400 mb-1">Work center</label>
+          <select
+            value={workCenterId}
+            onChange={(e) => setWorkCenterId(e.target.value ? Number(e.target.value) : "")}
+            className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
+          >
+            <option value="">Unassigned</option>
+            {(centers ?? []).map((c: WorkCenter) => (
+              <option key={c.id} value={c.id}>
+                {c.code} — {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="flex gap-2 justify-end mt-5">
+        <button onClick={onClose} className="btn-secondary text-sm">Cancel</button>
+        <button
+          onClick={() => mutation.mutate()}
+          disabled={mutation.isPending || !description.trim()}
+          className="btn-primary text-sm"
+        >
+          {mutation.isPending ? "Creating…" : "Create MAF + WO"}
+        </button>
+      </div>
+    </Overlay>
+  );
+}
+
+function WorkOrderRow({ wo, aircraftId }: { wo: WorkOrder; aircraftId: number }) {
+  const qc = useQueryClient();
+  const { data: centers } = useQuery({ queryKey: ["work-centers"], queryFn: fetchWorkCenters });
+  const [signoffNotes, setSignoffNotes] = useState("");
+
+  const patchMut = useMutation({
+    mutationFn: (body: { status?: DiscrepancyWorkStatus; work_center_id?: number }) =>
+      patchWorkOrder(wo.id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["aircraft-work-orders", aircraftId] });
+      qc.invalidateQueries({ queryKey: ["aircraft-discrepancies", aircraftId] });
+      qc.invalidateQueries({ queryKey: ["aircraft-detail", aircraftId] });
+    },
+  });
+
+  const signoffMut = useMutation({
+    mutationFn: () => qaSignoffWorkOrder(wo.id, { notes: signoffNotes }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["aircraft-work-orders", aircraftId] });
+      setSignoffNotes("");
+    },
+  });
+
+  return (
+    <div className="py-3 border-b border-slate-800 last:border-0 text-sm">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-mono font-semibold text-slate-200">{wo.jcn}</span>
+        <span className="font-mono text-xs text-slate-500">{wo.maf_number}</span>
+        <Badge variant={WS_VARIANT[wo.status]}>{WS_LABEL[wo.status]}</Badge>
+        {wo.work_center_code && (
+          <span className="text-xs text-slate-400">{wo.work_center_code}</span>
+        )}
+        {wo.has_qa_signoff && (
+          <Badge variant="success">QA signed</Badge>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-2">
+        <select
+          value={wo.work_center_id ?? ""}
+          onChange={(e) =>
+            patchMut.mutate({
+              work_center_id: e.target.value ? Number(e.target.value) : undefined,
+            })
+          }
+          className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs"
+        >
+          <option value="">Route…</option>
+          {(centers ?? []).map((c) => (
+            <option key={c.id} value={c.id}>{c.code}</option>
+          ))}
+        </select>
+        {(["IN_WORK", "AWP", "COMPLETED"] as DiscrepancyWorkStatus[]).map((s) => (
+          <button
+            key={s}
+            onClick={() => patchMut.mutate({ status: s })}
+            className="text-xs px-2 py-1 rounded border border-slate-700 hover:bg-slate-800"
+          >
+            {WS_LABEL[s]}
+          </button>
+        ))}
+      </div>
+      {!wo.has_qa_signoff && wo.status === "COMPLETED" && (
+        <div className="mt-2 flex gap-2">
+          <input
+            value={signoffNotes}
+            onChange={(e) => setSignoffNotes(e.target.value)}
+            placeholder="QA signoff notes"
+            className="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs"
+          />
+          <button
+            onClick={() => signoffMut.mutate()}
+            disabled={!signoffNotes.trim() || signoffMut.isPending}
+            className="btn-secondary text-xs"
+          >
+            Sign off
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ──────────────────────────────────────────────────────────────
 
 export default function AircraftMaintenance() {
   const { aircraftId } = useParams<{ aircraftId: string }>();
   const id = Number(aircraftId);
   const [releaseOpen, setReleaseOpen] = useState(false);
+  const [createDiscOpen, setCreateDiscOpen] = useState(false);
   const { showToast } = useToast();
 
   const { data: ac, isLoading: acLoading } = useQuery({
@@ -669,6 +882,24 @@ export default function AircraftMaintenance() {
   const { data: allDiscrepancies, isLoading: discLoading } = useQuery({
     queryKey: ["aircraft-discrepancies", id],
     queryFn: () => fetchAircraftDiscrepancies(id),
+    enabled: !isNaN(id),
+  });
+
+  const { data: workOrders } = useQuery({
+    queryKey: ["aircraft-work-orders", id],
+    queryFn: () => fetchWorkOrders(id),
+    enabled: !isNaN(id),
+  });
+
+  const { data: logbook } = useQuery({
+    queryKey: ["aircraft-logbook", id],
+    queryFn: () => fetchLogbook(id),
+    enabled: !isNaN(id),
+  });
+
+  const { data: releaseForecast } = useQuery({
+    queryKey: ["release-forecast", id],
+    queryFn: () => fetchReleaseForecast(id),
     enabled: !isNaN(id),
   });
 
@@ -801,6 +1032,14 @@ export default function AircraftMaintenance() {
             Stamped status matches computed. QA release available when maintenance state changes.
           </div>
         )}
+        {releaseForecast?.projected_release_date && (
+          <div className="mt-2 text-xs text-slate-400">
+            Projected release: {releaseForecast.projected_release_date}
+            {releaseForecast.blockers.length > 0 && (
+              <span className="text-yellow-400"> · {releaseForecast.blockers.length} blocker(s)</span>
+            )}
+          </div>
+        )}
       </div>
 
       {releaseOpen && (
@@ -837,22 +1076,69 @@ export default function AircraftMaintenance() {
         )}
       </div>
 
+      {/* Work Orders */}
+      <div className="card">
+        <h2 className="mb-3">Work Orders (4790 chain)</h2>
+        {(workOrders ?? []).filter((w) => w.status !== "CLOSED").length === 0 ? (
+          <p className="text-sm text-slate-500">No open work orders.</p>
+        ) : (
+          (workOrders ?? [])
+            .filter((w) => w.status !== "CLOSED")
+            .map((wo) => <WorkOrderRow key={wo.id} wo={wo} aircraftId={id} />)
+        )}
+      </div>
+
       {/* C — Open Discrepancies */}
       <div className="card">
-        <h2 className="mb-3">
-          Open Discrepancies
-          {openDiscs.length > 0 && (
-            <span className="ml-2 text-sm font-normal text-slate-400">
-              ({openDiscs.length})
-            </span>
-          )}
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2>
+            Open Discrepancies
+            {openDiscs.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-slate-400">
+                ({openDiscs.length})
+              </span>
+            )}
+          </h2>
+          <button
+            onClick={() => setCreateDiscOpen(true)}
+            className="btn-secondary text-xs flex items-center gap-1"
+          >
+            <Plus size={12} /> New
+          </button>
+        </div>
         {openDiscs.length === 0 ? (
           <p className="text-sm text-slate-500">No open discrepancies.</p>
         ) : (
           <div>
             {openDiscs.map((d) => (
               <DiscrepancyRow key={d.id} disc={d} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {createDiscOpen && (
+        <CreateDiscrepancyModal aircraftId={id} onClose={() => setCreateDiscOpen(false)} />
+      )}
+
+      {/* Aircraft logbook */}
+      <div className="card">
+        <h2 className="mb-3">Aircraft Logbook</h2>
+        {(logbook ?? []).length === 0 ? (
+          <p className="text-sm text-slate-500">No logbook entries yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {(logbook ?? []).slice(0, 15).map((e: LogbookEntry) => (
+              <div key={e.id} className="text-xs border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="neutral">{e.entry_type}</Badge>
+                  <span className="text-slate-300 font-medium">{e.title}</span>
+                  <span className="text-slate-500">{formatDate(e.entry_date)}</span>
+                </div>
+                {e.description && (
+                  <p className="text-slate-500 mt-0.5 line-clamp-2">{e.description}</p>
+                )}
+              </div>
             ))}
           </div>
         )}

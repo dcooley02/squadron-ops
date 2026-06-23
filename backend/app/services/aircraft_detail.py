@@ -8,8 +8,9 @@ from app.models.models import (
     Discrepancy,
     DiscrepancyWorkStatus,
 )
-from app.schemas.aircraft import AircraftDetail, DiscrepancyOut
+from app.schemas.aircraft import AircraftDetail
 from app.services.aircraft_status import compute_status, is_inspection_overdue
+from app.services.maintenance_chain import build_discrepancy_out
 
 
 def open_discrepancies(aircraft: Aircraft) -> List[Discrepancy]:
@@ -29,7 +30,7 @@ def build_aircraft_detail(aircraft: Aircraft, today: date | None = None) -> Airc
     open_discs = open_discrepancies(aircraft)
     overdue = overdue_inspections(aircraft, today)
     computed = compute_status(aircraft, open_discs, overdue)
-    open_disc_out = [DiscrepancyOut.model_validate(d) for d in aircraft.discrepancies if d.is_open]
+    open_disc_out = [build_discrepancy_out(d) for d in aircraft.discrepancies if d.is_open]
     return AircraftDetail(
         id=aircraft.id,
         bureau_number=aircraft.bureau_number,

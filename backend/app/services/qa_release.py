@@ -9,10 +9,13 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.models import (
     Aircraft,
     AircraftInspection,
+    AircraftLogbookEntry,
     AircraftStatus,
     Discrepancy,
     DiscrepancySeverity,
     DiscrepancyWorkStatus,
+    LogbookEntryType,
+    WorkOrder,
 )
 from app.schemas.aircraft import AircraftDetail, QaReleaseRequest
 from app.services.aircraft_detail import build_aircraft_detail, open_discrepancies, overdue_inspections
@@ -27,6 +30,7 @@ def _load_aircraft(db: Session, aircraft_id: int) -> Aircraft | None:
         .options(
             joinedload(Aircraft.discrepancies),
             joinedload(Aircraft.inspections).joinedload(AircraftInspection.inspection_type),
+            joinedload(Aircraft.work_orders).joinedload(WorkOrder.qa_signoffs),
         )
         .filter(Aircraft.id == aircraft_id)
         .first()
@@ -82,6 +86,20 @@ def _close_discrepancies(
         disc.closed_date = datetime.utcnow()
 
 
+def _work_orders_missing_signoff(
+    aircraft: Aircraft,
+    close_ids: list[int] | None,
+) -> list[str]:
+    """Open or completing work orders slated for closure must have QA signoff."""
+    missing: list[str] = []
+    close_set = set(close_ids or [])
+    for wo in aircraft.work_orders:
+        if wo.discrepancy_id and wo.discrepancy_id in close_set:
+            if not wo.qa_signoffs:
+                missing.append(f"Work order {wo.jcn} lacks QA signoff")
+    return missing
+
+
 def qa_release(
     db: Session,
     aircraft_id: int,
@@ -94,6 +112,10 @@ def qa_release(
     aircraft = _load_aircraft(db, aircraft_id)
     if aircraft is None:
         raise LookupError(f"Aircraft {aircraft_id} not found")
+
+    signoff_gaps = _work_orders_missing_signoff(aircraft, body.close_discrepancy_ids)
+    if signoff_gaps:
+        raise ValueError("; ".join(signoff_gaps))
 
     _close_discrepancies(aircraft, body)
 
@@ -112,6 +134,17 @@ def qa_release(
     stamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     note_line = f"[{stamp} QA Release {previous.value}→{computed.value}] {body.qa_notes.strip()}"
     aircraft.notes = f"{aircraft.notes}\n\n{note_line}".strip() if aircraft.notes else note_line
+
+    db.add(
+        AircraftLogbookEntry(
+            aircraft_id=aircraft.id,
+            entry_type=LogbookEntryType.QA_RELEASE,
+            hours_at_entry=aircraft.total_airframe_hours,
+            title=f"QA Release {previous.value}→{computed.value}",
+            description=body.qa_notes.strip(),
+            created_by_person_id=body.inspector_person_id,
+        )
+    )
 
     db.commit()
     db.refresh(aircraft)

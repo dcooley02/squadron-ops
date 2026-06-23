@@ -23,6 +23,10 @@ class DiscrepancyOut(BaseModel):
     # CNAF M-4790.2
     type_wo_code: Optional[str] = None
     jcn: Optional[str] = None
+    reported_by_name: Optional[str] = None
+    work_order_id: Optional[int] = None
+    work_center_code: Optional[str] = None
+    has_qa_signoff: bool = False
 
 
 class DiscrepancyCreate(BaseModel):
@@ -104,3 +108,4 @@ class QaReleaseRequest(BaseModel):
     qa_notes: str
     close_discrepancy_ids: Optional[List[int]] = None
     corrective_action: Optional[str] = None
+    inspector_person_id: Optional[int] = None

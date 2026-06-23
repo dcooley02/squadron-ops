@@ -7,7 +7,6 @@ filing discrepancies, and recording safety reports.
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.models import (
@@ -20,7 +19,7 @@ from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
 from app.schemas.scheduling import FlightLogCreate
 from app.services.currency_applicability import currencies_for_person
 from app.services.currency_renewal_rules import RENEWAL_RULES
-from app.services.jcn import assign_jcn
+from app.services.maintenance_chain import create_maintenance_chain
 
 
 def _upsert_currency_typed(
@@ -269,33 +268,18 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     )
     hac_person_id: Optional[int] = hac_log.person_id if hac_log else None
 
-    year = datetime.utcnow().year
     for disc_spec in payload.new_discrepancies:
-        max_seq = db.execute(
-            text(
-                f"SELECT MAX(CAST(SUBSTRING(maf_number FROM 9) AS INTEGER)) "
-                f"FROM discrepancies WHERE maf_number LIKE 'M-{year}-%'"
-            )
-        ).scalar()
-        maf = f"M-{year}-{(max_seq or 0) + 1:04d}"
-        opened = datetime.utcnow()
-        jcn = assign_jcn(db, opened_date=opened, model=Discrepancy)
-        db.add(Discrepancy(
+        create_maintenance_chain(
+            db,
             aircraft_id=sortie.aircraft_id,
-            sortie_id=sortie.id,
-            reported_by_person_id=hac_person_id,
             description=disc_spec.description,
             severity=disc_spec.severity,
             system_affected=disc_spec.system_affected,
             notes=disc_spec.notes,
-            maf_number=maf,
             type_wo_code=disc_spec.type_wo_code or "DM",
-            jcn=jcn,
-            work_status=DiscrepancyWorkStatus.OPEN,
-            opened_date=opened,
-            is_open=True,
-        ))
-        db.flush()  # make the new row visible for the next MAX query and JCN sequence
+            sortie_id=sortie.id,
+            reported_by_person_id=hac_person_id,
+        )
 
     # ── Step 9: insert SafetyReport rows ────────────────────────────────────────
     for sr_spec in payload.safety_reports:
