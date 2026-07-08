@@ -1,7 +1,7 @@
 """
 QA release — stamp line status after QA signoff when aircraft is safe for flight.
 """
-from datetime import date, datetime
+from datetime import date
 from typing import List, Tuple
 
 from sqlalchemy.orm import Session, joinedload
@@ -20,6 +20,7 @@ from app.models.models import (
 from app.schemas.aircraft import AircraftDetail, QaReleaseRequest
 from app.services.aircraft_detail import build_aircraft_detail, open_discrepancies, overdue_inspections
 from app.services.aircraft_status import compute_status
+from app.core.time import utc_now
 
 NON_RELEASE_STATUSES = {AircraftStatus.NMC, AircraftStatus.NMCM, AircraftStatus.NMCS}
 
@@ -83,7 +84,7 @@ def _close_discrepancies(
 
         disc.work_status = DiscrepancyWorkStatus.CLOSED
         disc.is_open = False
-        disc.closed_date = datetime.utcnow()
+        disc.closed_date = utc_now()
 
 
 def _work_orders_missing_signoff(
@@ -131,7 +132,7 @@ def qa_release(
     aircraft.status = computed
     aircraft.manual_status_override = None
 
-    stamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    stamp = utc_now().strftime("%Y-%m-%d %H:%M UTC")
     note_line = f"[{stamp} QA Release {previous.value}→{computed.value}] {body.qa_notes.strip()}"
     aircraft.notes = f"{aircraft.notes}\n\n{note_line}".strip() if aircraft.notes else note_line
 
@@ -146,6 +147,6 @@ def qa_release(
         )
     )
 
-    db.commit()
+    db.flush()
     db.refresh(aircraft)
     return build_aircraft_detail(aircraft, today)

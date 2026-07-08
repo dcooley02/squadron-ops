@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
 from datetime import date, datetime, time as dt_time
 from typing import List, Optional
 from app.database import get_db

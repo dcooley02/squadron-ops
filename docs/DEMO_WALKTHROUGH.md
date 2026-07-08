@@ -173,4 +173,4 @@ If no drift is visible, run `./scripts/demo-prep.sh` before presenting.
 - [ ] Maintenance shows drift aircraft 614, 615, 617
 - [ ] QA release on 614 succeeds; 615 blocked
 - [ ] Complete one sortie → crew currency advances
-- [ ] `pytest -q` passes (37 tests) and `npm run build` succeeds
+- [ ] `pytest -q` passes (51 tests) and `npm run build` succeeds

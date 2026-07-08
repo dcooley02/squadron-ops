@@ -3,20 +3,34 @@ Flight completion cascade service.
 Handles the full post-flight chain: closing the sortie, updating FlightLogs,
 inserting task credits, refreshing currencies, updating aircraft hours,
 filing discrepancies, and recording safety reports.
+
+Transaction policy: services flush only; the API route (or caller) commits.
 """
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.models import (
-    Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
-    Currency, Aircraft, Discrepancy, SafetyReport,
-    FlightMode, SortieOpsStatus, CrewPosition, DiscrepancySeverity, DiscrepancyWorkStatus, Person, CurrencyType,
-    SortieLeg, InstrumentApproach, TmrCode, SortieTmrCode, DataProvenance,
+    Aircraft,
+    CbrTaskOption,
+    CrewPosition,
+    Currency,
+    CurrencyType,
+    DataProvenance,
+    FlightLog,
+    FlightMode,
+    InstrumentApproach,
+    Person,
+    SafetyReport,
+    Sortie,
+    SortieLeg,
+    SortieOpsStatus,
+    SortieTaskCredit,
+    SortieTmrCode,
+    TmrCode,
 )
 from app.schemas.logging import SortieCompletePayload, UnscheduledSortiePayload
-from app.schemas.scheduling import FlightLogCreate
 from app.services.currency_applicability import currencies_for_person
 from app.services.currency_renewal_rules import RENEWAL_RULES
 from app.services.maintenance_chain import create_maintenance_chain
@@ -51,9 +65,12 @@ def _upsert_currency_typed(
 def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload) -> Sortie:
     """
     Apply the full post-flight cascade for a sortie.
-    All steps run inside a single transaction; any failure rolls back everything.
+
+    Locks the sortie row (``SELECT … FOR UPDATE``) so concurrent completes cannot
+    double-apply airframe hours. Flushes changes; caller must commit.
     """
-    # ── Step 1: load sortie with all relationships ──────────────────────────────
+    # ── Step 1: lock sortie row and load relationships (single query) ─────────
+    # with_for_update(of=Sortie) locks only the sorties row, not joined tables.
     sortie = (
         db.query(Sortie)
         .options(
@@ -64,16 +81,15 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             joinedload(Sortie.flight_logs).joinedload(FlightLog.task_credits),
         )
         .filter(Sortie.id == sortie_id)
+        .with_for_update(of=Sortie)
         .first()
     )
     if sortie is None:
         raise ValueError(f"Sortie {sortie_id} not found")
-
-    # ── Step 2: validate not already complete ───────────────────────────────────
     if sortie.is_complete:
         raise ValueError(f"Sortie {sortie_id} is already marked complete")
 
-    # ── Step 3: update sortie fields ────────────────────────────────────────────
+    # ── Step 2: update sortie fields ──────────────────────────────────────────
     sortie.takeoff_time = payload.actual_takeoff_time
     sortie.land_time = payload.actual_land_time
     sortie.duration_hours = payload.duration_hours
@@ -83,24 +99,8 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.ugr_fired               = payload.ugr_fired
     sortie.csw_rounds              = payload.csw_rounds
     sortie.csw_rounds_night        = payload.csw_rounds_night
-    sortie.landings_day            = payload.landings_day
-    sortie.landings_night          = payload.landings_night
-    sortie.landings_dve_day        = payload.landings_dve_day
-    sortie.landings_dve_night      = payload.landings_dve_night
-    # Mirror landings to the HAC's flight_log (per-crew source of truth, B1).
-    # A future CompleteSortie form revision will accept these per-crew rather
-    # than auto-derive them from the sortie totals.
-    _hac = next(
-        (fl for fl in sortie.flight_logs if fl.crew_position == CrewPosition.HAC),
-        None,
-    )
-    if _hac is not None:
-        _hac.landings_day             = payload.landings_day or 0
-        _hac.landings_night           = payload.landings_night or 0
-        _hac.landings_dve_day         = payload.landings_dve_day or 0
-        _hac.landings_dve_night       = payload.landings_dve_night or 0
-        _hac.landings_shipboard_day   = payload.landings_shipboard_day or 0
-        _hac.landings_shipboard_night = payload.landings_shipboard_night or 0
+    # Landings: prefer per-crew values on flight_log_actuals; else sortie-level + HAC mirror.
+    # Sortie-level totals set after FlightLog updates below.
     sortie.hoist_streams           = payload.hoist_streams
     sortie.hoist_recoveries        = payload.hoist_recoveries
     sortie.amns_iterations         = payload.amns_iterations
@@ -108,9 +108,6 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
     sortie.amns_ntrs               = payload.amns_ntrs
     sortie.strafe_dry_profiles_day   = payload.strafe_dry_profiles_day
     sortie.strafe_dry_profiles_night = payload.strafe_dry_profiles_night
-    # Logbook / NAVFLIR fields
-    sortie.landings_shipboard_day   = payload.landings_shipboard_day or None
-    sortie.landings_shipboard_night = payload.landings_shipboard_night or None
     # Derive location from legs when provided; fall back to direct payload fields
     if payload.legs:
         sortie.departure_location = payload.legs[0].departure_location
@@ -120,10 +117,10 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
         sortie.arrival_location   = payload.arrival_location
     if payload.flight_mode is not None:
         sortie.flight_mode = payload.flight_mode
-    sortie.is_complete = True
-    sortie.ops_status = SortieOpsStatus.DEBRIEFED
+    # Mark complete only after validation of payload references succeeds
+    # (set after TMR / flight_log / task-credit checks below).
 
-    flight_mode = sortie.flight_mode
+    flight_mode = payload.flight_mode if payload.flight_mode is not None else sortie.flight_mode
     flight_date = payload.actual_takeoff_time.date()
 
     # Create SortieLeg rows when routing was multi-stop
@@ -138,14 +135,14 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             duration_hours=leg_spec.duration_hours,
         ))
 
-    # Create SortieTmrCode junction rows (one per slot, max 3)
+    # Create SortieTmrCode junction rows (one per slot, max 3) — unknown codes rejected
     tmr_code_cache: dict[str, TmrCode] = {}
     for tmr_assign in payload.tmr_codes:
         tmr_obj = tmr_code_cache.get(tmr_assign.code)
         if tmr_obj is None:
             tmr_obj = db.query(TmrCode).filter(TmrCode.code == tmr_assign.code).first()
             if tmr_obj is None:
-                continue  # unknown code; skip silently
+                raise ValueError(f"Unknown TMR code: {tmr_assign.code}")
             tmr_code_cache[tmr_assign.code] = tmr_obj
         db.add(SortieTmrCode(
             sortie_id=sortie.id,
@@ -186,6 +183,19 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
         if actuals.instructor_remarks is not None:
             fl.instructor_remarks = actuals.instructor_remarks
         fl.special_crew_time_hours = actuals.special_crew_time_hours
+        # Per-crew landings (None means "not provided" for rollup logic)
+        if actuals.landings_day is not None:
+            fl.landings_day = actuals.landings_day
+        if actuals.landings_night is not None:
+            fl.landings_night = actuals.landings_night
+        if actuals.landings_dve_day is not None:
+            fl.landings_dve_day = actuals.landings_dve_day
+        if actuals.landings_dve_night is not None:
+            fl.landings_dve_night = actuals.landings_dve_night
+        if actuals.landings_shipboard_day is not None:
+            fl.landings_shipboard_day = actuals.landings_shipboard_day
+        if actuals.landings_shipboard_night is not None:
+            fl.landings_shipboard_night = actuals.landings_shipboard_night
         for appr in actuals.approaches:
             db.add(InstrumentApproach(
                 flight_log_id=fl.id,
@@ -198,26 +208,73 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
                 logged_at=payload.actual_land_time,
             ))
 
+    # Landings rollup: per-crew when any crewmember provided landing fields
+    per_crew_landings = any(
+        a.landings_day is not None
+        or a.landings_night is not None
+        or a.landings_dve_day is not None
+        or a.landings_dve_night is not None
+        or a.landings_shipboard_day is not None
+        or a.landings_shipboard_night is not None
+        for a in payload.flight_log_actuals
+    )
+    if per_crew_landings:
+        sortie.landings_day = sum(fl.landings_day or 0 for fl in sortie.flight_logs)
+        sortie.landings_night = sum(fl.landings_night or 0 for fl in sortie.flight_logs)
+        sortie.landings_dve_day = sum(fl.landings_dve_day or 0 for fl in sortie.flight_logs)
+        sortie.landings_dve_night = sum(fl.landings_dve_night or 0 for fl in sortie.flight_logs)
+        sortie.landings_shipboard_day = sum(fl.landings_shipboard_day or 0 for fl in sortie.flight_logs) or None
+        sortie.landings_shipboard_night = sum(fl.landings_shipboard_night or 0 for fl in sortie.flight_logs) or None
+    else:
+        # Legacy: sortie-level landings mirrored onto HAC flight log
+        sortie.landings_day = payload.landings_day
+        sortie.landings_night = payload.landings_night
+        sortie.landings_dve_day = payload.landings_dve_day
+        sortie.landings_dve_night = payload.landings_dve_night
+        sortie.landings_shipboard_day = payload.landings_shipboard_day or None
+        sortie.landings_shipboard_night = payload.landings_shipboard_night or None
+        _hac = next(
+            (fl for fl in sortie.flight_logs if fl.crew_position == CrewPosition.HAC),
+            None,
+        )
+        if _hac is not None:
+            _hac.landings_day = payload.landings_day or 0
+            _hac.landings_night = payload.landings_night or 0
+            _hac.landings_dve_day = payload.landings_dve_day or 0
+            _hac.landings_dve_night = payload.landings_dve_night or 0
+            _hac.landings_shipboard_day = payload.landings_shipboard_day or 0
+            _hac.landings_shipboard_night = payload.landings_shipboard_night or 0
+
     # Build person_id → flight_log map for task-credit insertion
     log_by_person: dict[int, FlightLog] = {fl.person_id: fl for fl in sortie.flight_logs}
 
-    task_options: dict[str, CbrTaskOption] = {
-        row.code: row for row in db.query(CbrTaskOption).all()
-    }
-
     # ── Step 5: insert SortieTaskCredit rows ────────────────────────────────────
+    needed_task_codes = {c.task_code for c in payload.task_credits}
+    task_options: dict[str, CbrTaskOption] = {}
+    if needed_task_codes:
+        task_options = {
+            row.code: row
+            for row in db.query(CbrTaskOption)
+            .filter(CbrTaskOption.code.in_(needed_task_codes))
+            .all()
+        }
+
     for credit_spec in payload.task_credits:
         task_opt = task_options.get(credit_spec.task_code)
+        if task_opt is None:
+            raise ValueError(f"Unknown CBR task code: {credit_spec.task_code}")
         if (
             flight_mode == FlightMode.SIM_TOFT
-            and task_opt is not None
             and not task_opt.sim_eligible
         ):
-            continue
+            continue  # domain rule: non-sim-eligible tasks skipped on SIM sorties
         for person_id in credit_spec.person_ids:
             fl = log_by_person.get(person_id)
             if fl is None:
-                continue  # person not on this sortie — skip silently
+                raise ValueError(
+                    f"Person {person_id} is not on sortie {sortie_id}; "
+                    f"cannot credit task {credit_spec.task_code}"
+                )
             # Honour uniqueness: skip if already credited (idempotent re-submit)
             existing = db.query(SortieTaskCredit).filter(
                 SortieTaskCredit.flight_log_id == fl.id,
@@ -232,6 +289,12 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
                 grade=credit_spec.grade,
                 remarks=credit_spec.remarks,
             ))
+
+    # Mark complete only after payload references validated
+    sortie.is_complete = True
+    sortie.ops_status = SortieOpsStatus.DEBRIEFED
+    if payload.flight_mode is not None:
+        sortie.flight_mode = payload.flight_mode
 
     # Flush so we can count credits per log below
     db.flush()
@@ -257,10 +320,18 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             if rule and rule(sortie, fl):
                 _upsert_currency_typed(db, person.id, ct, flight_date)
 
-    # ── Step 7: update aircraft hours (LIVE only) ────────────────────────────────
-    if flight_mode == FlightMode.LIVE and sortie.aircraft_id and sortie.aircraft:
-        sortie.aircraft.total_airframe_hours += payload.duration_hours
-        sortie.aircraft.hours_since_phase += payload.duration_hours
+    # ── Step 7: update aircraft hours (LIVE only), with row lock ────────────────
+    if flight_mode == FlightMode.LIVE and sortie.aircraft_id:
+        aircraft = (
+            db.query(Aircraft)
+            .filter(Aircraft.id == sortie.aircraft_id)
+            .with_for_update()
+            .first()
+        )
+        if aircraft is not None:
+            aircraft.total_airframe_hours += payload.duration_hours
+            aircraft.hours_since_phase += payload.duration_hours
+            sortie.aircraft = aircraft
 
     # ── Step 8: insert new Discrepancy rows ─────────────────────────────────────
     hac_log = next(
@@ -293,10 +364,8 @@ def complete_sortie(db: Session, sortie_id: int, payload: SortieCompletePayload)
             status="OPEN",
         ))
 
-    # ── Step 10: commit ──────────────────────────────────────────────────────────
-    db.commit()
-
-    # Return freshly loaded sortie so the route handler can serialise it
+    # ── Step 10: flush (caller commits) ─────────────────────────────────────────
+    db.flush()
     db.refresh(sortie)
     return sortie
 
@@ -306,7 +375,7 @@ def create_and_complete_unscheduled(
 ) -> Sortie:
     """
     Create an unscheduled or simulator sortie, optionally running the full
-    completion cascade in the same transaction.
+    completion cascade in the same transaction. Flushes only; caller commits.
     """
     from app.models.models import FlightLog as FL
 
@@ -341,13 +410,11 @@ def create_and_complete_unscheduled(
     db.flush()
 
     if not payload.immediate_complete:
-        db.commit()
         db.refresh(sortie)
         return sortie
 
-    # Immediate completion — run the cascade
+    # Immediate completion — run the cascade (still flush-only)
     if payload.completion is None:
         raise ValueError("completion payload is required when immediate_complete=True")
 
-    # complete_sortie commits internally
     return complete_sortie(db, sortie.id, payload.completion)

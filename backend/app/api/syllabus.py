@@ -4,9 +4,9 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.models.models import (
-    SyllabusEvent, GradecardLineItem, Gradecard, GradecardLineItemResult,
+    SyllabusEvent, Gradecard, GradecardLineItemResult,
     Person, Sortie, FlightLog, Qualification,
-    SyllabusLevel, SyllabusTrack, GradingScheme, GradecardStatus, Role,
+    SyllabusLevel, SyllabusTrack, GradecardStatus, Role,
 )
 from app.schemas.syllabus import (
     SyllabusEventOut, SyllabusEventTemplate,

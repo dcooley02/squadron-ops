@@ -2,26 +2,30 @@
 
 Development conventions and domain reference for Squadron Ops contributors.
 
-See [README.md](../../README.md), [ROADMAP.md](../../ROADMAP.md), and [docs/LIMITATIONS.md](../LIMITATIONS.md) for project scope.
+See [README.md](../../README.md), [ROADMAP.md](../../ROADMAP.md), [docs/PROJECT_OVERVIEW.md](../PROJECT_OVERVIEW.md), and [docs/LIMITATIONS.md](../LIMITATIONS.md) for project scope and current status.
+
+**Near-term priorities:** stakeholder-driven (CM, multi-squadron, password productization). Phases A–D done for demo scope. Full list: [ROADMAP.md](../../ROADMAP.md).
 
 ## Stack
 
 - Backend: FastAPI + SQLAlchemy 2.0 + PostgreSQL 16 + Alembic, Python 3.12
-- Frontend: React 18 + TypeScript + Vite + Tailwind CSS + shadcn/ui
-- Auth: JWT login (demonstration build uses open nav for all authenticated users)
-- Database runs in Docker (see `docker-compose.yml`)
+- Frontend: React 19 + TypeScript (strict) + Vite + Tailwind CSS + TanStack Query
+- Auth: JWT + `require_roles` (ADMIN always allowed). Open ACL: `DEMO_OPEN_RBAC=true` / `VITE_DEMO_OPEN_RBAC=true`
+- Database runs in Docker (see `docker-compose.yml`); app runs on the host
+- Services **flush** only; route handlers **commit** (see flight completion, QA release, schedule publish)
 
 ## Project structure
 
-- `backend/app/models/` — SQLAlchemy ORM models
+- `backend/app/models/` — ORM package by domain (`enums`, `person`, `sortie`, `maintenance`, …); `models.py` re-exports
 - `backend/app/schemas/` — Pydantic request/response schemas
 - `backend/app/api/` — FastAPI route handlers, organized by feature
-- `backend/app/core/` — auth, config, shared utilities
+- `backend/app/core/` — auth, config, shared utilities (`time.utc_now`)
 - `backend/app/services/` — business logic (cascade, currency, scheduling, logbook, qa_release)
 - `backend/alembic/` — database migrations
-- `frontend/src/pages/` — top-level page components
+- `frontend/src/pages/` — top-level page components (+ helper modules)
 - `frontend/src/components/` — reusable components
-- `frontend/src/lib/` — API client, hooks, utilities
+- `frontend/src/lib/api/` — domain API client + types (import as `../lib/api`)
+- `frontend/src/lib/` — permissions, pdf, dates
 
 ## Conventions
 
@@ -69,8 +73,25 @@ OL (Overland), FCF (Functional Check Flight)
 ## Architecture invariants
 
 - Three-layer backend: SQLAlchemy models → Pydantic schemas → FastAPI routes
+- Business logic in `app/services/`, not route handlers
 - Status colors: green good / yellow warning / red action needed
 - Per-crewmember flight hours live on `FlightLog`, not sortie-level fields
+- Prefer `joinedload` / `selectinload` for relationship-heavy reads
+- Prefer timezone-aware UTC (`datetime.now(timezone.utc)`) over `datetime.utcnow()`
+
+## Testing
+
+- Prefer `./scripts/verify.sh` before opening a PR (starts Postgres if needed)
+- Pytest integration tests require Postgres on port **5433**
+- Without Docker, most tests error on connection refused
+- Frontend: `npm run test` + `npm run build` + `npm run lint` (all gated in CI)
+- Prefer `from app.models import X` (or existing `from app.models.models import X`)
+- CBR / WTM catalog: `app/catalogs/cbr_enclosure2.py` (seed + integrity tests); do not hardcode task lists in services
+- API base URL: `VITE_API_BASE_URL` (default `http://localhost:8001`)
+- Clock helpers: `from app.core.time import utc_now` (not `datetime.utcnow`)
+- RBAC tests must clear settings cache: `get_settings.cache_clear()` after toggling `DEMO_OPEN_RBAC`
+- When changing cascade, readiness, QA release, or auth: add or extend tests in `backend/tests/`
+- RBAC: always include **denial** cases (wrong role → 403)
 
 ## Quickstart
 

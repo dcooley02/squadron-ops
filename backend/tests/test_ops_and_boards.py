@@ -4,6 +4,7 @@ from app.models.models import BoardType, SortieOpsStatus
 from app.services.instructor_pairing import rank_instructors
 from app.schemas.ops import DayOpsOut
 from app.services.ops_day import build_day_ops, publish_schedule
+from app.core.time import utc_now
 
 
 def test_rank_instructors_excludes_examinee(db, pilot, cbr_tasks):
@@ -26,7 +27,7 @@ def test_rank_instructors_excludes_examinee(db, pilot, cbr_tasks):
         db,
         board_type=BoardType.HAC_BOARD,
         examinee_person_id=pilot.id,
-        scheduled_at=datetime.utcnow() + timedelta(days=1),
+        scheduled_at=utc_now() + timedelta(days=1),
     )
     assert all(r["person_id"] != pilot.id for r in ranked)
 
@@ -34,7 +35,7 @@ def test_rank_instructors_excludes_examinee(db, pilot, cbr_tasks):
 def test_publish_schedule_sets_sorties_published(db, pilot, aircraft):
     from app.models.models import FlightLog, CrewPosition, Sortie
 
-    tomorrow = datetime.utcnow().date() + timedelta(days=1)
+    tomorrow = utc_now().date() + timedelta(days=1)
     takeoff = datetime.combine(tomorrow, datetime.min.time().replace(hour=9))
     sortie = Sortie(
         aircraft_id=aircraft.id,

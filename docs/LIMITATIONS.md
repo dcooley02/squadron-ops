@@ -1,24 +1,36 @@
 # Known Limitations
 
-Squadron Ops is a portfolio demonstration platform. The following limitations are intentional or planned for future releases.
+Squadron Ops is a portfolio demonstration platform. The following limitations are intentional, known risks, or planned for future releases. See [ROADMAP.md](../ROADMAP.md) for phased remediation.
 
 ---
 
 ## Authentication & access control
 
-- JWT login is required for API access
-- Demonstration build grants full navigation and write access to all authenticated users
-- Production role-based access control (per-route permissions) is not yet enforced
-- Password reset is not implemented
-- Demo password (`demo1234`) is for local use only
+- JWT login is required for all `/api/*` routes (except login and OpenAPI docs)
+- **RBAC is enforced** on routes that declare `require_roles(...)` (ADMIN always allowed)
+- Open ACL for demos: set `DEMO_OPEN_RBAC=true` (API) and `VITE_DEMO_OPEN_RBAC=true` (SPA)
+- Frontend nav and sensitive routes (`/ops`, `/schedule`, `/admin`) are role-gated unless open-ACL mode is on
+- Not every write route is fully role-scoped yet (e.g. sortie complete is any authenticated user) — expand as product needs demand
+- Admin “password reset” sets the person to the configured demo password — not a real recovery flow
+- Demo password (`demo1234`) and default JWT secret are for local use only; never deploy with repository defaults
+- Password reset as a product feature is not implemented
+
+---
+
+## Flight completion integrity
+
+- Sortie complete takes `SELECT … FOR UPDATE` on the sortie (and aircraft for LIVE hour increments)
+- Unknown TMR codes, unknown CBR task codes, and task-credit person IDs not on the sortie return **400**
+- Per-crew landings are supported on Complete Sortie; if left blank, legacy sortie-level landings still mirror to HAC
+- HTTP 500 on complete no longer echoes raw exception text
 
 ---
 
 ## Readiness (WTM)
 
 - T-ratings use table-driven anchor tasks and simplified Appendix D math
-- CBR task library contains 61 seeded tasks — full Enclosure 2 parity is planned
-- Hand verification against CHSCWPINST 3500.1F is recommended before operational claims
+- CBR task library is an **Enclosure 2-shaped** HSC demo catalog (92 tasks / 13 anchors in `app/catalogs/cbr_enclosure2.py`) — not a verbatim CHSCWPINST 3500.1F extract
+- Hand verification against the live Wing Training Manual is still required before any operational claim
 
 ---
 
@@ -48,9 +60,14 @@ Squadron Ops is a portfolio demonstration platform. The following limitations ar
 ## Technical notes
 
 - HSC-specific syllabus and currency catalog (community templates planned)
-- `datetime.utcnow()` deprecation warnings in seed data scripts
-- Automated test suite: 37 integration tests (PostgreSQL required)
-- CI: GitHub Actions (postgres → pytest → frontend build)
+- Timestamps use `app.core.time.utc_now()` (naive UTC wall clock for TIMESTAMP WITHOUT TIME ZONE); prefer this over deprecated `datetime.utcnow()`
+- Frontend API base URL defaults to `http://localhost:8001`; override with `VITE_API_BASE_URL` (see `frontend/.env.example`)
+- `seed.py` remains a large monolith (~2k lines); page components are still large though helpers were extracted
+- Transaction ownership: domain services flush; routes commit (Phase B) — audit middleware still owns its own session
+- Frontend unit tests are smoke-level (Vitest); no browser e2e suite yet
+- Automated backend suite: **51** pytest integration tests (PostgreSQL required on port 5433)
+- Tests fail hard if Docker/Postgres is not running — use `./scripts/verify.sh` or `docker compose up -d`
+- CI: GitHub Actions (Postgres → pytest → frontend lint → FE unit test → build)
 
 ---
 
@@ -61,8 +78,13 @@ When extending this codebase:
 - Three-layer backend: SQLAlchemy models → Pydantic schemas → FastAPI routes
 - Business logic in `app/services/`, not route handlers
 - Type hints throughout; Pydantic v2 with `ConfigDict(from_attributes=True)`
-- All timestamps UTC-stored
+- All timestamps UTC-stored (prefer aware UTC going forward)
 - Frontend: TypeScript strict mode, TanStack Query for data fetching
 - Status colors: green (good) · yellow (warning) · red (action required)
+- Prefer `joinedload` / `selectinload` for relationship-heavy reads (avoid N+1)
 
-See [ROADMAP.md](../ROADMAP.md) for planned capabilities.
+See [ROADMAP.md](../ROADMAP.md) for engineering phases (A–D) and domain build order.
+
+---
+
+*Last updated: July 2026*

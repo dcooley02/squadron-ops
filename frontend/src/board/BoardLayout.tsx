@@ -8,17 +8,23 @@ interface Props {
 }
 
 export default function BoardLayout({ boardName, lastUpdatedAt, children }: Props) {
-  const [now, setNow] = useState(Date.now());
+  // Clock starts at 0; effect sets wall time (avoids impure Date.now during render).
+  const [now, setNow] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setNow(Date.now());
+    const id = setInterval(tick, 1000);
+    const immediate = window.setTimeout(tick, 0);
+    return () => {
+      clearInterval(id);
+      window.clearTimeout(immediate);
+    };
   }, []);
 
-  const clockText = format(new Date(now), "HH:mm:ss");
+  const clockText = now ? format(new Date(now), "HH:mm:ss") : "--:--:--";
 
   let updatedText = "—";
-  if (lastUpdatedAt) {
+  if (lastUpdatedAt && now) {
     const secs = Math.round((now - lastUpdatedAt) / 1000);
     updatedText = secs < 5 ? "Updated just now" : `Updated ${secs}s ago`;
   }

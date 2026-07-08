@@ -1,8 +1,6 @@
 """4790 maintenance chain: discrepancy → MAF → work order → QA signoff."""
 from __future__ import annotations
 
-from datetime import datetime
-
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -23,10 +21,11 @@ from app.models.models import (
 from app.schemas.aircraft import DiscrepancyOut
 from app.schemas.maintenance import WorkOrderOut
 from app.services.jcn import assign_jcn
+from app.core.time import utc_now
 
 
 def _next_maf_number(db: Session, *, year: int | None = None) -> str:
-    yr = year or datetime.utcnow().year
+    yr = year or utc_now().year
     max_seq = db.execute(
         text(
             "SELECT MAX(CAST(SUBSTRING(maf_number FROM 9) AS INTEGER)) "
@@ -64,7 +63,7 @@ def sync_discrepancy_from_work_order(wo: WorkOrder, disc: Discrepancy) -> None:
     disc.corrective_action = wo.corrective_action
     if wo.status == DiscrepancyWorkStatus.CLOSED:
         disc.is_open = False
-        disc.closed_date = wo.completed_at or datetime.utcnow()
+        disc.closed_date = wo.completed_at or utc_now()
     elif wo.status == DiscrepancyWorkStatus.COMPLETED:
         disc.is_open = True
     if wo.maf_id and wo.maf:
@@ -86,7 +85,7 @@ def create_maintenance_chain(
     work_center_id: int | None = None,
 ) -> tuple[Discrepancy, Maf, WorkOrder]:
     """Create discrepancy + MAF + work order in one chain."""
-    opened = datetime.utcnow()
+    opened = utc_now()
     maf_number = _next_maf_number(db)
     jcn = assign_jcn(db, opened_date=opened, model=WorkOrder)
 
@@ -167,7 +166,7 @@ def update_work_order_status(
     wo.status = status
     if corrective_action is not None:
         wo.corrective_action = corrective_action
-    now = datetime.utcnow()
+    now = utc_now()
     if status == DiscrepancyWorkStatus.IN_WORK and wo.assigned_at is None:
         wo.assigned_at = now
     if status in (DiscrepancyWorkStatus.COMPLETED, DiscrepancyWorkStatus.CLOSED):

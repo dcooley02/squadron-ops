@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
+import { API_BASE_URL } from "../lib/api";
 
 const DEMO_ACCOUNTS = [
   { label: "SDO", username: "anderson.robert", hint: "Schedule publish, Ops console" },
@@ -29,8 +31,20 @@ export default function Login() {
     setSubmitting(true);
     try {
       await login(username.trim(), password);
-    } catch {
-      setError("Invalid username or password.");
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 401) {
+          setError("Invalid username or password.");
+        } else if (err.code === "ERR_NETWORK" || !err.response) {
+          setError(
+            `Cannot reach API at ${API_BASE_URL}. Is the backend running on port 8001?`
+          );
+        } else {
+          setError(`Login failed (HTTP ${err.response.status}).`);
+        }
+      } else {
+        setError("Login failed. Check the console for details.");
+      }
     } finally {
       setSubmitting(false);
     }

@@ -45,14 +45,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) {
-      setIsLoading(false);
       return;
     }
+    let cancelled = false;
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
     fetchMe()
-      .then(setUser)
-      .catch(() => logout())
-      .finally(() => setIsLoading(false));
+      .then((me) => {
+        if (!cancelled) setUser(me);
+      })
+      .catch(() => {
+        if (!cancelled) logout();
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token, logout]);
 
   const hasRole = useCallback(

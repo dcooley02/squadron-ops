@@ -13,7 +13,6 @@ from app.models.models import (
     BoardType,
     Gradecard,
     Person,
-    Qualification,
     Role,
     SyllabusEvent,
 )

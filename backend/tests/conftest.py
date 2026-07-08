@@ -1,6 +1,6 @@
 """Postgres-backed pytest fixtures (enums/JSON require Postgres, not SQLite)."""
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,8 +26,8 @@ from app.models.models import (
     Person,
     Role,
     Sortie,
-    TaskGrade,
 )
+from app.core.time import utc_now
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
@@ -166,7 +166,7 @@ def make_open_sortie(
     pilot: Person,
     flight_mode: FlightMode = FlightMode.LIVE,
 ) -> tuple[Sortie, FlightLog]:
-    now = datetime.utcnow()
+    now = utc_now()
     sortie = Sortie(
         event_type="PROFICIENCY",
         aircraft_id=aircraft.id,
@@ -198,9 +198,9 @@ def complete_payload_for(
     strafe_profiles_night: int = 0,
     task_credits: list | None = None,
 ):
-    from app.schemas.logging import FlightLogActuals, SortieCompletePayload, TaskCreditCreate
+    from app.schemas.logging import FlightLogActuals, SortieCompletePayload
 
-    now = datetime.utcnow()
+    now = utc_now()
     return SortieCompletePayload(
         actual_takeoff_time=now - timedelta(hours=2),
         actual_land_time=now,
@@ -223,7 +223,7 @@ def complete_payload_for(
 @pytest.fixture
 def seed_currency(db: Session, pilot: Person, currency_types: dict[str, CurrencyType]) -> Currency:
     ct = currency_types["NIGHT_NVD"]
-    today = datetime.utcnow().date()
+    today = utc_now().date()
     row = Currency(
         person_id=pilot.id,
         currency_type_id=ct.id,

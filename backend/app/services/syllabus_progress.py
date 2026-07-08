@@ -1,7 +1,7 @@
 """Per-person syllabus progression from gradecards and flight log credits."""
-from typing import List, Optional
+from typing import List
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.models.models import (
     Gradecard,

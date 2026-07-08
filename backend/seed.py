@@ -29,6 +29,12 @@ random.seed(42)
 sys.path.insert(0, os.path.dirname(__file__))
 
 from passlib.hash import bcrypt as bc
+from app.catalogs.cbr_enclosure2 import (
+    ANCHOR_TASK_CODES as _ANCHOR_TASK_CODES,
+    AREA_CONFIG_SPECS,
+    CBR_TASK_SPECS,
+)
+from app.core.time import utc_now
 from app.database import SessionLocal
 from app.models.models import (
     Person, Aircraft, Qualification, Currency, SyllabusEvent,
@@ -1031,99 +1037,12 @@ def seed_aircraft_inspections(db, aircraft_list, inspection_types):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CBR Task Options  (unchanged from batch-2)
+# CBR Task Options / Capability area configs (Enclosure 2-shaped catalog)
 # ═══════════════════════════════════════════════════════════════════════════════
-
-_CBR_TASKS = [
-    ("MOB 201", CapabilityArea.MOB, "NATOPS Check — Aircrew demonstrate proficiency per NATOPS procedures; evaluated by designated check aircrewman.", CrewScope.INDIVIDUAL, False, 1.5, [], "Aircrew demonstrate NATOPS-standard emergency procedures and systems knowledge.", "Complete all required EP demonstrations; verbal/written exam as required by NATOPS."),
-    ("MOB 202", CapabilityArea.MOB, "Emergency Procedure Training — Crew execute simulated emergency procedures in flight or simulator.", CrewScope.CREW, True, 0.5, [], "Crew correctly identify, communicate, and execute all assigned EP scenarios.", "Execute each EP per NATOPS checklist; HAC grades crew actions on task/condition/standard."),
-    ("MOB 203", CapabilityArea.MOB, "Basic Flight / FAM / FCF — Crew demonstrate basic airmanship during familiarization, proficiency, or functional check flight.", CrewScope.CREW, False, 1.5, [], "Crew maintain aircraft control within NATOPS limits throughout all maneuvers.", "Complete all planned profiles; no deviations outside NATOPS limits; HAC debriefs crew."),
-    ("MOB 204", CapabilityArea.MOB, "Night Flight — Crew demonstrate proficiency during unaided or NVG night operations.", CrewScope.CREW, False, 2.0, ["MOB 203"], "Crew maintain situational awareness and aircraft control during night operations.", "Complete all planned night profiles; NVG goggle ops IAW NATOPS Chapter 7 if applicable."),
-    ("MOB 205", CapabilityArea.MOB, "Air-Capable Ship Recovery Day — Pilot demonstrates proficiency in day shipboard approaches and deck landings.", CrewScope.INDIVIDUAL, False, 0.5, [], "Pilot executes stabilized approach to within NATOPS tolerances on each approach.", "Minimum 6 approaches; grade each approach per NATOPS T&R; HAC certifies completion."),
-    ("MOB 209", CapabilityArea.MOB, "Instrument Check — Aircrew demonstrate proficiency in IMC and instrument approach procedures.", CrewScope.INDIVIDUAL, True, 1.0, [], "Aircrew fly all assigned instrument approach categories within NATOPS tolerances.", "Complete ILS, RNAV, and partial-panel approaches; HAC or IP grades each approach."),
-    ("MOB 211", CapabilityArea.MOB, "Terminal Area Operations — Crew demonstrate proficiency in confined area and pinnacle landing operations.", CrewScope.CREW, False, 0.5, [], "Crew completes terminal area profiles without exceeding aircraft or site limitations.", "Conduct minimum one confined area approach/departure; crew brief/debrief required."),
-    ("MOB 214", CapabilityArea.MOB, "Formation Flight — Crew demonstrate proficiency in multi-aircraft formation operations.", CrewScope.CREW, False, 0.5, [], "Crew maintains assigned position within NATOPS formation parameters throughout flight.", "Lead and wing phases; all crew demonstrate comm discipline and position awareness."),
-    ("FSO 207", CapabilityArea.FSO, "Live Hoist — Crew execute external rescue hoist operations with a live swimmer or load.", CrewScope.CREW, False, 0.5, [], "Crew successfully deploys/recovers load or SAR swimmer within NATOPS weight and speed limits.", "Minimum two hoist cycles with live load; AWS grades hook-up procedure and crew coordination."),
-    ("FSO 208", CapabilityArea.FSO, "Hoist Training — Crew execute hoist training with a dummy load or training device.", CrewScope.CREW, False, 0.5, [], "Crew demonstrates correct hoist procedures and emergency actions with training load.", "Demonstrate hook-up, hoist operation, and recovery; practice emergency jettison procedure."),
-    ("FSO 209", CapabilityArea.FSO, "Search and Rescue — Crew execute a search pattern and execute survivor recovery in a SAR scenario.", CrewScope.CREW, False, 1.0, [], "Crew locates simulated survivor within planned search area and executes recovery.", "Execute assigned search pattern; demonstrate datum run procedures; recover survivor via hoist."),
-    ("ASU 201", CapabilityArea.ASU, "CSW Pattern — Pilot/crew execute a coordinated surface warfare engagement pattern against a surface target.", CrewScope.INDIVIDUAL, False, 0.5, [], "Crew executes coordinated search/strike pattern and correctly employs sensors against surface targets.", "Complete all assigned CSW pattern phases; sensor employment grades per ASU T&R criteria."),
-    ("ASU 206", CapabilityArea.ASU, "MTS Employment — Aircrew employ the Multi-spectral Targeting System against surface targets.", CrewScope.INDIVIDUAL, True, 0.5, [], "AWS/aircrew acquires and tracks assigned targets with MTS within ASU engagement criteria.", "Demonstrate MTS initialization, target acquisition, tracking, and handoff; debrief grade assigned."),
-    ("ASU 207", CapabilityArea.ASU, "SCAR — Crew execute a Strike Coordination and Reconnaissance mission in support of surface forces.", CrewScope.CREW, True, 0.5, [], "Crew successfully coordinates with surface units and provides reconnaissance products.", "Complete full SCAR profile; comm plan executed; crew debrief includes target product assessment."),
-    ("SOF 207", CapabilityArea.SOF, "SOF Insertion/Extraction — Crew insert or extract special operations forces via fast-rope, SPIE, or hover delivery.", CrewScope.CREW, False, 0.5, [], "Crew successfully inserts/extracts SOF element within time and accuracy parameters.", "Execute insertion or extraction IAW SOF T&R criteria; HAC grades crew coordination and airspeed control."),
-    ("PR 201", CapabilityArea.PR, "Combat Search and Rescue — Crew executes recovery of isolated personnel in a contested environment.", CrewScope.CREW, False, 0.5, [], "Crew establishes comm with isolated personnel, executes recovery under threat environment constraints.", "Authentication, comm relay, threat assessment, and survivor recovery completed per PR T&R criteria."),
-    ("STW 210", CapabilityArea.STW, "Large Force Exercise — Crew participates in a large force strike exercise with multi-unit coordination.", CrewScope.CREW, False, 0.5, [], "Crew integrates with strike package within EMCON and timing parameters.", "Complete all assigned LFE tasking; mission commander debrief; T/M/S grades assigned per exercise criteria."),
-    ("LOG 201", CapabilityArea.LOG, "Day VERTREP — Crew execute vertical replenishment operations transferring cargo between ships.", CrewScope.CREW, False, 0.5, [], "Crew completes all assigned VERTREP cycles within weight limits and ship course/speed parameters.", "Demonstrate cargo hook-up, transfer, and release procedures; AWS grades sling load operations."),
-    ("MIW 203", CapabilityArea.MIW, "ALMDS Simulator Day — Aircrew demonstrate proficiency with the Airborne Laser Mine Detection System in a simulator.", CrewScope.INDIVIDUAL, True, 0.5, [], "Aircrew demonstrates ALMDS system initialization, sweep pattern execution, and contact classification.", "Complete simulator ALMDS profile; system setup, sweep pattern, and contact report graded per MIW T&R."),
-    ("MIW 205", CapabilityArea.MIW, "ALMDS Employment Day — Crew employ ALMDS in flight against a real or simulated minefield during daylight.", CrewScope.INDIVIDUAL, False, 0.5, [], "Crew successfully executes ALMDS lane sweep and generates contact report within time parameters.", "Execute full ALMDS lane; report contacts per MIW T&R criteria; post-mission data download graded."),
-    ("MOB 206", CapabilityArea.MOB, "Overwater Flight — Crew demonstrate proficiency during overwater transit and ditching procedures.", CrewScope.CREW, False, 1.0, ["MOB 203"], "Crew maintains aircraft control and executes ditching EPs per NATOPS during overwater profiles.", "Complete overwater transit profile; crew brief ditching EPs; HAC grades crew coordination."),
-    ("MOB 207", CapabilityArea.MOB, "Confined Area Day — Crew demonstrate day confined-area takeoff and landing operations.", CrewScope.CREW, False, 0.5, ["MOB 203"], "Crew completes confined area profiles without exceeding site or aircraft limitations.", "Minimum one confined area approach/departure; crew debrief required."),
-    ("MOB 208", CapabilityArea.MOB, "Confined Area Night — Crew demonstrate NVG confined-area operations.", CrewScope.CREW, False, 0.5, ["MOB 204"], "Crew maintains SA and aircraft control during NVG confined-area profiles.", "Complete NVG confined area profile IAW NATOPS Chapter 7."),
-    ("MOB 210", CapabilityArea.MOB, "External Load Day — Crew demonstrate external cargo sling load operations in daylight.", CrewScope.CREW, False, 0.5, [], "Crew completes external load cycles within weight and airspeed limits.", "Demonstrate hook-up, lift, transit, and release; AWS grades sling load procedures."),
-    ("FSO 201", CapabilityArea.FSO, "Overwater SAR Pattern — Crew execute overwater search pattern and datum procedures.", CrewScope.CREW, False, 0.5, [], "Crew establishes datum and executes assigned search pattern within planned area.", "Complete datum run and search legs; comm plan executed per FSO T&R."),
-    ("FSO 202", CapabilityArea.FSO, "CSAR Overland — Crew execute deliberate combat search and rescue overland profile.", CrewScope.CREW, False, 1.0, [], "Crew authenticates isolated personnel and executes recovery under threat constraints.", "Authentication, threat assessment, and recovery completed per FSO/PR criteria."),
-    ("FSO 203", CapabilityArea.FSO, "Vertrep SAR — Crew combine VERTREP and SAR swimmer deployment in a composite scenario.", CrewScope.CREW, False, 0.5, [], "Crew coordinates cargo transfer and swimmer deployment without exceeding limits.", "Execute combined profile; AWS grades hook-up and swimmer coordination."),
-    ("FSO 204", CapabilityArea.FSO, "Night Hoist — Crew execute external hoist operations at night with NVG.", CrewScope.CREW, False, 0.5, ["FSO 207"], "Crew successfully deploys/recovers load at night within NATOPS limits.", "Minimum two NVG hoist cycles; AWS grades crew coordination."),
-    ("FSO 205", CapabilityArea.FSO, "Fast Rope Insertion — Crew insert personnel via fast-rope in a FSO support scenario.", CrewScope.CREW, False, 0.5, [], "Crew maintains hover parameters and inserts personnel within time/accuracy limits.", "Execute fast-rope insertion IAW FSO T&R; HAC grades airspeed and hover control."),
-    ("FSO 206", CapabilityArea.FSO, "SPIE Extraction — Crew extract personnel via Special Patrol Insertion/Extraction rig.", CrewScope.CREW, False, 0.5, [], "Crew successfully extracts personnel via SPIE within NATOPS weight limits.", "Demonstrate SPIE rigging, extraction, and recovery; AWS grades procedures."),
-    ("ASU 202", CapabilityArea.ASU, "Strafe Dry — Pilot/crew execute dry strafe pattern against surface target.", CrewScope.INDIVIDUAL, True, 0.5, [], "Crew executes strafe pattern within ASU engagement parameters.", "Complete dry strafe profile; sensor/weapon employment graded per ASU T&R."),
-    ("ASU 203", CapabilityArea.ASU, "Strafe Live — Pilot/crew execute live strafe engagement against authorized target.", CrewScope.INDIVIDUAL, False, 0.5, ["ASU 202"], "Crew executes live strafe within safety and engagement parameters.", "Complete live strafe profile; range safety and engagement criteria met."),
-    ("ASU 204", CapabilityArea.ASU, "Rocket Dry — Crew execute dry rocket engagement pattern.", CrewScope.CREW, True, 0.5, [], "Crew executes rocket pattern within ASU engagement criteria.", "Complete dry rocket profile; crew coordination graded per ASU T&R."),
-    ("ASU 205", CapabilityArea.ASU, "Rocket Live — Crew execute live rocket engagement.", CrewScope.CREW, False, 0.5, ["ASU 204"], "Crew executes live rocket engagement within safety parameters.", "Complete live rocket profile; range safety criteria met."),
-    ("ASU 208", CapabilityArea.ASU, "Armed Reconnaissance — Crew conduct armed reconnaissance in support of surface forces.", CrewScope.CREW, False, 1.0, [], "Crew provides timely reconnaissance products to supported unit.", "Complete armed recon profile; comm and reporting per ASU T&R."),
-    ("SOF 201", CapabilityArea.SOF, "SOF Infiltration Day — Crew infiltrate SOF element via hover delivery in daylight.", CrewScope.CREW, False, 0.5, [], "Crew inserts SOF element within time and accuracy parameters.", "Execute day infiltration IAW SOF T&R; HAC grades hover and airspeed control."),
-    ("SOF 202", CapabilityArea.SOF, "SOF Infiltration Night — Crew infiltrate SOF element via NVG hover delivery.", CrewScope.CREW, False, 0.5, ["SOF 201"], "Crew inserts SOF element at night within NATOPS NVG limits.", "Execute NVG infiltration profile; crew coordination graded."),
-    ("SOF 203", CapabilityArea.SOF, "SOF Extraction Day — Crew extract SOF element via fast-rope or hover pickup.", CrewScope.CREW, False, 0.5, [], "Crew extracts SOF element within planned time parameters.", "Execute day extraction IAW SOF T&R criteria."),
-    ("SOF 204", CapabilityArea.SOF, "SOF Extraction Night — Crew extract SOF element during NVG operations.", CrewScope.CREW, False, 0.5, ["SOF 203"], "Crew extracts SOF element at night within NVG parameters.", "Execute NVG extraction profile; HAC grades crew coordination."),
-    ("SOF 205", CapabilityArea.SOF, "Tactical Air Landing — Crew land at unprepared site in support of SOF operations.", CrewScope.CREW, False, 0.5, [], "Crew completes tactical landing without exceeding site limitations.", "Site survey, approach, and departure per SOF T&R; crew debrief required."),
-    ("SOF 206", CapabilityArea.SOF, "Urban SOF Support — Crew support SOF operations in urban/confined environment.", CrewScope.CREW, False, 0.5, [], "Crew maintains comm and aircraft control in urban support profile.", "Execute urban support scenario; threat and comm plan per SOF T&R."),
-    ("PR 202", CapabilityArea.PR, "Overwater CSAR — Crew execute overwater combat search and rescue recovery.", CrewScope.CREW, False, 1.0, [], "Crew locates and recovers isolated personnel in overwater environment.", "Execute overwater CSAR profile; datum and recovery per PR T&R."),
-    ("PR 203", CapabilityArea.PR, "Deliberate CSAR Overland — Crew execute deliberate overland CSAR mission.", CrewScope.CREW, False, 1.0, [], "Crew authenticates and recovers isolated personnel in contested overland environment.", "Authentication, threat assessment, and recovery per PR T&R."),
-    ("PR 204", CapabilityArea.PR, "CSAR Simulator — Crew execute CSAR scenario in simulator or training device.", CrewScope.CREW, True, 0.5, [], "Crew demonstrates CSAR comm, authentication, and recovery procedures.", "Complete simulator CSAR profile; all EPs and comm procedures graded."),
-    ("PR 205", CapabilityArea.PR, "Isolated Personnel Authentication — Crew demonstrate authentication procedures for isolated personnel.", CrewScope.CREW, True, 0.5, [], "Crew correctly authenticates isolated personnel per PR comm plan.", "Execute authentication drill; comm relay and challenge/response graded."),
-    ("STW 201", CapabilityArea.STW, "Strike Coordination — Crew coordinate strike package timing and EMCON.", CrewScope.CREW, False, 0.5, [], "Crew integrates with strike package within timing parameters.", "Complete strike coordination profile; mission commander debrief."),
-    ("STW 202", CapabilityArea.STW, "Time-Sensitive Targeting — Crew support time-sensitive targeting mission.", CrewScope.CREW, False, 0.5, [], "Crew provides timely targeting support to supported unit.", "Execute TST profile; comm and targeting product per STW T&R."),
-    ("STW 203", CapabilityArea.STW, "Armed Escort — Crew provide armed escort for surface or air assets.", CrewScope.CREW, False, 0.5, [], "Crew maintains escort position and threat response per STW criteria.", "Complete armed escort profile; threat reaction graded."),
-    ("STW 204", CapabilityArea.STW, "Battle Damage Assessment — Crew conduct BDA after strike operations.", CrewScope.CREW, False, 0.5, [], "Crew provides timely and accurate BDA to supported commander.", "Execute BDA profile; imagery and reporting per STW T&R."),
-    ("STW 205", CapabilityArea.STW, "Strike Package Integration — Crew integrate into multi-unit strike package.", CrewScope.CREW, False, 0.5, [], "Crew maintains EMCON and timing within strike package parameters.", "Complete integration profile; debrief includes package coordination assessment."),
-    ("STW 206", CapabilityArea.STW, "Close Air Support — Crew provide CAS in support of ground forces.", CrewScope.CREW, False, 1.0, [], "Crew provides timely CAS within ROE and comm parameters.", "Execute CAS profile; 9-line and comm plan per STW T&R."),
-    ("STW 207", CapabilityArea.STW, "Armed Reconnaissance Strike — Crew conduct armed recon with strike authority.", CrewScope.CREW, False, 1.0, [], "Crew identifies targets and executes strike within ROE.", "Complete armed recon/strike profile; BDA and reporting graded."),
-    ("STW 208", CapabilityArea.STW, "Night Strike — Crew participate in night strike exercise.", CrewScope.CREW, False, 0.5, ["STW 201"], "Crew integrates with night strike package within NVG parameters.", "Complete night strike profile; NVG ops IAW NATOPS."),
-    ("STW 209", CapabilityArea.STW, "Exercise Strike — Crew participate in fleet exercise strike scenario.", CrewScope.CREW, False, 0.5, [], "Crew completes assigned exercise strike tasking.", "Exercise debrief; T/M/S grades per exercise criteria."),
-    ("LOG 202", CapabilityArea.LOG, "Night VERTREP — Crew execute vertical replenishment at night.", CrewScope.CREW, False, 0.5, ["LOG 201"], "Crew completes VERTREP cycles at night within ship parameters.", "Demonstrate NVG VERTREP procedures; AWS grades sling load ops."),
-    ("LOG 203", CapabilityArea.LOG, "VERTREP Simulator — Crew practice VERTREP procedures in simulator.", CrewScope.CREW, True, 0.5, [], "Crew demonstrates VERTREP hook-up and transfer procedures.", "Complete simulator VERTREP profile; procedures graded per LOG T&R."),
-    ("LOG 204", CapabilityArea.LOG, "Cargo Transfer — Crew transfer internal cargo between ships via VERTREP.", CrewScope.CREW, False, 0.5, [], "Crew completes cargo transfer within weight and timing limits.", "Execute cargo transfer profile; AWS grades procedures."),
-    ("MIW 201", CapabilityArea.MIW, "MIW Brief — Aircrew demonstrate mine warfare threat recognition and reporting.", CrewScope.INDIVIDUAL, True, 0.5, [], "Aircrew correctly identifies mine threats and reports per MIW doctrine.", "Complete MIW threat brief and recognition drill."),
-    ("MIW 202", CapabilityArea.MIW, "ALMDS Simulator Night — Aircrew demonstrate ALMDS operations at night in simulator.", CrewScope.INDIVIDUAL, True, 0.5, ["MIW 203"], "Aircrew executes ALMDS night sweep pattern and contact classification.", "Complete night simulator ALMDS profile per MIW T&R."),
-    ("MIW 204", CapabilityArea.MIW, "ALMDS Employment Night — Crew employ ALMDS during night flight operations.", CrewScope.INDIVIDUAL, False, 0.5, ["MIW 205"], "Crew executes night ALMDS lane sweep and contact report.", "Execute night ALMDS profile; post-mission data download graded."),
-    ("MIW 206", CapabilityArea.MIW, "Mine Countermeasures Support — Crew support MCM unit with ALMDS lane clearance.", CrewScope.CREW, False, 1.0, [], "Crew provides timely ALMDS products to MCM commander.", "Execute MCM support profile; lane clearance and reporting per MIW T&R."),
-]
-
-_ANCHOR_TASK_CODES = frozenset({
-    "MOB 203", "MOB 204", "MOB 209",
-    "FSO 207", "FSO 209",
-    "ASU 201", "ASU 207",
-    "SOF 207",
-    "PR 201",
-    "STW 210",
-    "LOG 201",
-    "MIW 203", "MIW 205",
-})
-
-_AREA_CONFIG_SEED = [
-    (CapabilityArea.MOB, "Mobility", 180, 365, ["NIGHT_NVD"], []),
-    (CapabilityArea.FSO, "Fleet Support Ops", 180, 365, ["CSTRS_WINCH"], []),
-    (CapabilityArea.ASU, "Anti-Surface Warfare", 180, 365, ["CSW", "STRAFE_DRY"], []),
-    (CapabilityArea.SOF, "Special Operations Forces", 180, 365, [], []),
-    (CapabilityArea.PR, "Personnel Recovery", 180, 365, [], []),
-    (CapabilityArea.STW, "Strike Warfare", 180, 365, [], []),
-    (CapabilityArea.LOG, "Logistics", 180, 365, [], []),
-    (CapabilityArea.MIW, "Mine Warfare", 180, 365, ["ALMDS_PILOT"], []),
-]
-
 
 def seed_capability_area_configs(db):
     count = 0
-    for area, label, t1, t2, currencies, quals in _AREA_CONFIG_SEED:
+    for area, label, t1, t2, currencies, quals in AREA_CONFIG_SPECS:
         db.add(CapabilityAreaConfig(
             capability_area=area,
             label=label,
@@ -1139,14 +1058,24 @@ def seed_capability_area_configs(db):
 
 def seed_cbr_task_options(db):
     count = 0
-    for code, area, desc, scope, sim_elig, min_hrs, confers, moe, mop in _CBR_TASKS:
-        db.add(CbrTaskOption(code=code, capability_area=area, description=desc, crew_scope=scope,
-                             sim_eligible=sim_elig, min_time_hours=min_hrs, confers_codes=confers,
-                             moe_notes=moe, mop_notes=mop, is_active=True,
-                             is_anchor_task=code in _ANCHOR_TASK_CODES))
+    for spec in CBR_TASK_SPECS:
+        db.add(CbrTaskOption(
+            code=spec.code,
+            capability_area=spec.capability_area,
+            description=spec.description,
+            crew_scope=spec.crew_scope,
+            sim_eligible=spec.sim_eligible,
+            min_time_hours=spec.min_time_hours,
+            confers_codes=spec.confers_codes,
+            moe_notes=spec.moe_notes,
+            mop_notes=spec.mop_notes,
+            is_active=True,
+            is_anchor_task=spec.is_anchor_task,
+        ))
         count += 1
     db.flush()
     return count
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1170,15 +1099,17 @@ _NOTES = [
 
 # CBR task codes likely credited per event_type
 _EVENT_TASK_MAP: dict[str, list[str]] = {
-    "INTRO":     ["MOB 203", "MOB 211"],
-    "PROFICIENCY": ["MOB 203", "MOB 211", "MOB 202"],
-    "ASU":       ["MOB 203", "ASU 201", "ASU 207", "MOB 202"],
-    "CSAR":      ["FSO 209", "FSO 207", "FSO 208", "MOB 203", "PR 201"],
-    "SOF":       ["SOF 207", "MOB 203"],
-    "AMCM":      ["MIW 203", "MIW 205", "MOB 203"],
-    "STAN_EVAL": ["MOB 203", "MOB 202"],
-    "TRAINING":  ["MOB 203"],
-    "FCF":       ["MOB 203", "MOB 202"],
+    "INTRO":       ["MOB 203", "MOB 211", "MOB 216"],
+    "PROFICIENCY": ["MOB 203", "MOB 211", "MOB 202", "MOB 207"],
+    "ASU":         ["MOB 203", "ASU 201", "ASU 207", "ASU 209", "MOB 202"],
+    "CSAR":        ["FSO 209", "FSO 207", "FSO 208", "MOB 203", "PR 201", "PR 206"],
+    "SOF":         ["SOF 207", "SOF 208", "MOB 203"],
+    "AMCM":        ["MIW 203", "MIW 205", "MIW 207", "MOB 203"],
+    "STAN_EVAL":   ["MOB 203", "MOB 202", "MOB 209"],
+    "TRAINING":    ["MOB 203", "MOB 206"],
+    "FCF":         ["MOB 203", "MOB 202"],
+    "VERTREP":     ["LOG 201", "LOG 205", "MOB 203"],
+    "STRIKE":      ["STW 210", "STW 206", "MOB 203"],
 }
 
 _GRADE_POOL = [TaskGrade.Q] * 70 + [TaskGrade.CQ] * 20 + [TaskGrade.NO] * 6 + [TaskGrade.NG] * 4
@@ -1450,8 +1381,8 @@ def seed_discrepancies(db, aircraft_list):
 
     def _add(ac, desc, sys, sev, ws, is_open=True, corrective=None):
         days_ago = random.randint(1, 21) if is_open else random.randint(30, 90)
-        opened   = datetime.utcnow() - timedelta(days=days_ago)
-        closed   = (datetime.utcnow() - timedelta(days=random.randint(1, days_ago - 1))
+        opened   = utc_now() - timedelta(days=days_ago)
+        closed   = (utc_now() - timedelta(days=random.randint(1, days_ago - 1))
                     if not is_open else None)
         db.add(Discrepancy(
             aircraft_id=ac.id,
@@ -1534,7 +1465,7 @@ def seed_safety_reports(db, all_logs, all_pilots):
         severity="HAZARD", category="FOD",
         description="Post-recovery FOD sweep identified two loose screws (approx 3/8\") on the flight deck adjacent to the port sponson. Screws appear to have backed out from the deck grating panel; lock washers found nearby. No aircraft or personnel damage.",
         actions_taken="Screws and washers removed and secured. Maintenance notified; deck grating inspected and all remaining fasteners torque-checked. Crew reminded of post-recovery FOD walk procedures.",
-        status="CLOSED", closed_at=datetime.utcnow() - timedelta(days=random.randint(1, 5)),
+        status="CLOSED", closed_at=utc_now() - timedelta(days=random.randint(1, 5)),
     ))
     count += 1
 
@@ -1895,7 +1826,7 @@ def seed_publish_today_schedule(db):
     sdo = db.query(Person).filter(Person.role == Role.SDO).first()
     pub = SchedulePublication(
         schedule_date=TODAY,
-        published_at=datetime.utcnow(),
+        published_at=utc_now(),
         published_by_person_id=sdo.id if sdo else None,
         remarks="Daily schedule published — crew notified via squadron ops",
     )

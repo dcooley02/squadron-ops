@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Optional, List, Dict
 from app.models.models import (
     CrewPosition, DiscrepancySeverity, FlightMode, CapabilityArea, TaskGrade, CrewScope,
-    ApproachType, ApproachConditions, DataProvenance,
+    ApproachType, ApproachConditions,
 )
 
 
@@ -128,6 +128,13 @@ class FlightLogActuals(BaseModel):
     syllabus_event_completed: Optional[str] = None
     instructor_remarks: Optional[str] = None
     special_crew_time_hours: float = 0.0
+    # Per-crew landings (None = not provided; use legacy sortie-level rollup)
+    landings_day: Optional[int] = None
+    landings_night: Optional[int] = None
+    landings_dve_day: Optional[int] = None
+    landings_dve_night: Optional[int] = None
+    landings_shipboard_day: Optional[int] = None
+    landings_shipboard_night: Optional[int] = None
     approaches: List[ApproachPayload] = []
 
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
@@ -102,19 +102,12 @@ function LineItemFillRow({
   scheme: GradingScheme;
   onSaved: (updated: GradecardLineItemResultOut) => void;
 }) {
+  // Initial state comes from `result`; parent remounts this row via key when server data changes.
   const [score, setScore] = useState(result.four_tier_score ?? "");
   const [compStatus, setCompStatus] = useState(result.completion_status ?? "");
   const [waived, setWaived] = useState(result.waived);
   const [remarks, setRemarks] = useState(result.remarks ?? "");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
-
-  // Sync from cache when server data updates (e.g., after another component patches the card)
-  useEffect(() => {
-    setScore(result.four_tier_score ?? "");
-    setCompStatus(result.completion_status ?? "");
-    setWaived(result.waived);
-    setRemarks(result.remarks ?? "");
-  }, [result]);
 
   const { mutate: save } = useMutation({
     mutationFn: (body: Parameters<typeof patchGradecardLineItem>[2]) =>
@@ -266,19 +259,17 @@ export default function GradecardFill() {
     enabled: gc?.syllabus_event_id != null,
   });
 
-  // Local header state (editable date and instructor)
+  // Local header state (editable date and instructor) — adjust during render when card loads
   const [localDate, setLocalDate] = useState("");
   const [localInstructorId, setLocalInstructorId] = useState("");
-  const [headerInitialized, setHeaderInitialized] = useState(false);
+  const [headerCardId, setHeaderCardId] = useState<number | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (gc && !headerInitialized) {
-      setLocalDate(gc.card_date);
-      setLocalInstructorId(gc.instructor_person_id ? String(gc.instructor_person_id) : "");
-      setHeaderInitialized(true);
-    }
-  }, [gc, headerInitialized]);
+  if (gc && headerCardId !== gc.id) {
+    setHeaderCardId(gc.id);
+    setLocalDate(gc.card_date);
+    setLocalInstructorId(gc.instructor_person_id ? String(gc.instructor_person_id) : "");
+  }
 
   // Header mutation (date, instructor)
   const headerMutation = useMutation({
@@ -497,7 +488,7 @@ export default function GradecardFill() {
                 .sort((a, b) => a.line_item.display_order - b.line_item.display_order)
                 .map((result) => (
                   <LineItemFillRow
-                    key={result.id}
+                    key={`${result.id}-${result.four_tier_score ?? ""}-${result.completion_status ?? ""}-${result.waived}-${result.remarks ?? ""}`}
                     result={result}
                     gradecardId={gcId}
                     scheme={gc.grading_scheme}

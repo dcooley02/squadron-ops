@@ -1,11 +1,8 @@
-from datetime import datetime
 
 from app.models.models import (
     AircraftInspection,
     DiscrepancyWorkStatus,
     InspectionType,
-    Maf,
-    WorkOrder,
 )
 from app.services.maintenance_chain import create_maintenance_chain, record_qa_signoff, update_work_order_status
 from app.services.maintenance_forecast import phase_forecast, release_forecast
@@ -28,7 +25,6 @@ def test_create_maintenance_chain(db, aircraft, pilot):
 
 
 def test_phase_inspection_resets_hours(db, aircraft):
-    from datetime import date
 
     insp_type = InspectionType(
         code="PHASE",

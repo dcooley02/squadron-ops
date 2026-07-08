@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 12
     demo_password: str = "demo1234"
+    # When true, require_roles authenticates only (open ACL for portfolio demos).
+    # Env: DEMO_OPEN_RBAC=true|false
+    demo_open_rbac: bool = False
 
 
 @lru_cache

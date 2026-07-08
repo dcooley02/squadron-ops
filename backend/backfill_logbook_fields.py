@@ -33,6 +33,8 @@ random.seed(99)  # deterministic but different from seed.py's seed(42)
 sys.path.insert(0, os.path.dirname(__file__))
 
 from datetime import datetime
+
+from app.core.time import utc_now
 from app.database import SessionLocal
 from app.models.models import (
     Sortie, FlightLog, InstrumentApproach,
@@ -109,7 +111,7 @@ def backfill(db):
                     airport_icao=random.choice(_APPROACH_AIRPORTS),
                     runway=None,
                     remarks=None,
-                    logged_at=s.land_time or s.takeoff_time or datetime.utcnow(),
+                    logged_at=s.land_time or s.takeoff_time or utc_now(),
                 ))
                 approaches_inserted += 1
 

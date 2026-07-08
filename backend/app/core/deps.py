@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, Request, status
 from jose import JWTError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.models import Person, Role
@@ -21,10 +22,24 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Person:
     return person
 
 
-def require_roles(*_roles: Role):
-    """Authenticate only — role checks deferred until per-route permissions ship."""
+def require_roles(*roles: Role):
+    """Require an authenticated user whose role is in ``roles`` (or ADMIN).
+
+    When ``settings.demo_open_rbac`` is true, any authenticated user is allowed
+    (portfolio open-ACL mode). ADMIN always passes when RBAC is enforced.
+    """
 
     def checker(user: Person = Depends(get_current_user)) -> Person:
+        if get_settings().demo_open_rbac:
+            return user
+        if user.role == Role.ADMIN:
+            return user
+        if roles and user.role not in roles:
+            allowed = ", ".join(r.value for r in roles)
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient role; requires one of: {allowed}",
+            )
         return user
 
     return checker

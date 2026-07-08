@@ -15,7 +15,7 @@ Built by a naval aviator to demonstrate credible domain modeling, full-stack eng
 - **Assisted scheduling** — ranked crew suggestions and week proposals with transparent fitness warnings (human-in-the-loop)
 - **SDO operations** — schedule publish, watchbill, day-of-ops status, ATO and brief-sheet PDF export
 - **Fullscreen TV boards** — squadron snapshot for ready-room displays
-- **37 automated tests** and CI pipeline (PostgreSQL → pytest → production build)
+- **51 automated tests** and CI pipeline (PostgreSQL → pytest → lint → production build)
 
 ---
 
@@ -47,8 +47,8 @@ Representative views from the local demonstration environment (synthetic HSC/MH-
 |-------|----------------|
 | **Backend** | Python 3.12, FastAPI, SQLAlchemy 2.0, Pydantic, Alembic |
 | **Database** | PostgreSQL 16 (Docker Compose) |
-| **Frontend** | React 18, TypeScript (strict), Vite, Tailwind CSS, TanStack Query |
-| **Auth** | JWT bearer tokens |
+| **Frontend** | React 19, TypeScript (strict), Vite, Tailwind CSS, TanStack Query |
+| **Auth** | JWT bearer tokens + role checks (`require_roles`); optional open ACL via `DEMO_OPEN_RBAC` |
 | **PDF export** | WeasyPrint (readiness brief, ATO, brief sheets, gradecards, logbook) |
 | **CI** | GitHub Actions |
 
@@ -85,10 +85,35 @@ Open **http://localhost:5174/login**
 
 ### Verify
 
+PostgreSQL must be running (Docker Desktop + Compose; port **5433**). Without it, most pytest cases fail on connection errors.
+
 ```bash
-cd backend && pytest -q          # 37 tests (Postgres on :5433)
+# Full local gate (compose up → pytest → frontend test → build → lint)
+./scripts/verify.sh
+
+# Or step-by-step:
+cd backend && pytest -q          # 51 tests (Postgres on :5433)
+cd frontend && npm run test      # Vitest unit tests
 cd frontend && npm run build
+cd frontend && npm run lint      # gated in CI
 ```
+
+`SKIP_COMPOSE=1` / `SKIP_LINT=1` can be set on `verify.sh` when Postgres is already up or lint should be skipped.
+
+API URL for the SPA defaults to `http://localhost:8001`. Override with `VITE_API_BASE_URL` (see `frontend/.env.example`).
+
+### Project status
+
+Domain surface through assisted scheduling, SDO tools, and TV boards is **shipped**. Phases A–D engineering work is in place (quality bar, RBAC, complete integrity, module splits, route code-splitting, **Enclosure 2-shaped CBR catalog**, **Appendix D fixtures**, **per-crew landings**).
+
+**RBAC:** enforced by default. For open portfolio demos, set:
+
+```bash
+export DEMO_OPEN_RBAC=true          # backend
+# frontend/.env — VITE_DEMO_OPEN_RBAC=true
+```
+
+Phases A–D engineering work is complete for the portfolio demo. Further domain depth (verbatim WTM Enclosure 2, configuration management, multi-squadron) is stakeholder-driven — see [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -127,7 +152,7 @@ cd frontend && npm run build
 - Day-of-operations console: publish schedule, watchbill, sortie status advancement
 - ATO and brief-sheet PDF export
 - HTTP audit log for consequential actions
-- JWT-authenticated API; role-based access control planned for production deployment
+- JWT-authenticated API with role checks on sensitive routes; open ACL available via `DEMO_OPEN_RBAC`
 
 ---
 
@@ -185,11 +210,11 @@ Interactive API documentation: **http://localhost:8001/docs**
 
 | Document | Description |
 |----------|-------------|
-| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Technical overview, data model, API inventory |
+| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Technical overview, data model, API inventory, maturity |
 | [docs/DEMO_WALKTHROUGH.md](docs/DEMO_WALKTHROUGH.md) | 12-minute guided demonstration script |
 | [docs/DEMO_QUICK_REFERENCE.md](docs/DEMO_QUICK_REFERENCE.md) | Accounts, routes, troubleshooting |
-| [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | Known limitations and planned work |
-| [ROADMAP.md](ROADMAP.md) | Capability roadmap and scope commitments |
+| [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | Known limitations, integrity risks, technical debt |
+| [ROADMAP.md](ROADMAP.md) | Domain build order + engineering phases A–D |
 
 ---
 

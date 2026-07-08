@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.catalogs.cbr_enclosure2 import AREA_CONFIG_SPECS, CBR_TASK_SPECS
 from app.models.models import (
     CapabilityArea,
     CapabilityAreaConfig,
@@ -44,38 +45,28 @@ class AreaRule:
     min_qual_codes: Tuple[str, ...] = ()
 
 
+def _catalog_anchors(area: CapabilityArea) -> Tuple[str, ...]:
+    return tuple(
+        s.code
+        for s in CBR_TASK_SPECS
+        if s.is_anchor_task and s.capability_area == area
+    )
+
+
+# Fallbacks when DB config/task tables are empty (tests / pre-seed). Single source: catalog.
 AREA_RULES: Dict[CapabilityArea, AreaRule] = {
-    CapabilityArea.MOB: AreaRule(
-        anchor_tasks=("MOB 203", "MOB 204", "MOB 209"),
-        currency_codes=("NIGHT_NVD",),
-    ),
-    CapabilityArea.FSO: AreaRule(
-        anchor_tasks=("FSO 207", "FSO 209"),
-        currency_codes=("CSTRS_WINCH",),
-    ),
-    CapabilityArea.ASU: AreaRule(
-        anchor_tasks=("ASU 201", "ASU 207"),
-        currency_codes=("CSW", "STRAFE_DRY"),
-    ),
-    CapabilityArea.SOF: AreaRule(anchor_tasks=("SOF 207",)),
-    CapabilityArea.PR: AreaRule(anchor_tasks=("PR 201",)),
-    CapabilityArea.STW: AreaRule(anchor_tasks=("STW 210",)),
-    CapabilityArea.LOG: AreaRule(anchor_tasks=("LOG 201",)),
-    CapabilityArea.MIW: AreaRule(
-        anchor_tasks=("MIW 203", "MIW 205"),
-        currency_codes=("ALMDS_PILOT",),
-    ),
+    area: AreaRule(
+        anchor_tasks=_catalog_anchors(area),
+        t1_recency_days=t1,
+        t2_recency_days=t2,
+        currency_codes=tuple(currencies),
+        min_qual_codes=tuple(quals),
+    )
+    for area, _label, t1, t2, currencies, quals in AREA_CONFIG_SPECS
 }
 
 AREA_LABELS: Dict[CapabilityArea, str] = {
-    CapabilityArea.MOB: "Mobility",
-    CapabilityArea.FSO: "Fleet Support Ops",
-    CapabilityArea.ASU: "Anti-Surface Warfare",
-    CapabilityArea.SOF: "Special Operations Forces",
-    CapabilityArea.PR: "Personnel Recovery",
-    CapabilityArea.STW: "Strike Warfare",
-    CapabilityArea.LOG: "Logistics",
-    CapabilityArea.MIW: "Mine Warfare",
+    area: label for area, label, *_rest in AREA_CONFIG_SPECS
 }
 
 

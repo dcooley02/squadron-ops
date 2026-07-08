@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_roles
 from app.database import get_db
-from app.models.models import Person, Role, Sortie, SortieOpsStatus
+from app.models.models import Person, Role, Sortie, WatchbillEntry
 from app.schemas.ops import (
     DayOpsOut,
     SchedulePublishRequest,
@@ -40,10 +40,10 @@ def publish_day_schedule(
             body.published_by_person_id or user.id,
             body.remarks,
         )
+        db.commit()
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-
-    from app.models.models import Person
 
     publisher = None
     if pub.published_by_person_id:
@@ -87,8 +87,6 @@ def create_watchbill_entry(
     db: Session = Depends(get_db),
     _: Person = Depends(require_roles(Role.SDO, Role.CO_XO)),
 ):
-    from app.models.models import Person, WatchbillEntry
-
     person = db.query(Person).filter(Person.id == body.person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")

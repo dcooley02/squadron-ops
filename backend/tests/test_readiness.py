@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,11 +17,12 @@ from app.models.models import (
     TaskGrade,
 )
 from app.services.readiness import TRating, build_squadron_readiness, rate_person_area
+from app.core.time import utc_now
 
 
 def _credit(db, sortie, fl, code, days_ago: int):
     sortie.is_complete = True
-    sortie.land_time = datetime.utcnow() - timedelta(days=days_ago)
+    sortie.land_time = utc_now() - timedelta(days=days_ago)
     db.add(
         SortieTaskCredit(
             sortie_id=sortie.id,

@@ -1,22 +1,10 @@
-import axios from "axios";
-
-export const api = axios.create({
-  baseURL: "http://localhost:8001",
-  headers: { "Content-Type": "application/json" },
-});
-
-const storedToken = localStorage.getItem("squadron_ops_token");
-if (storedToken) {
-  api.defaults.headers.common.Authorization = `Bearer ${storedToken}`;
-}
-
-// ---------- Type definitions matching the backend schemas ----------
+/** Hand-maintained API types matching backend Pydantic schemas.
+ *  See `scripts/generate-api-types.md` for optional OpenAPI generation.
+ */
 
 export type Role =
   | "pilot" | "aircrew" | "sdo"
   | "training_officer" | "maint_control" | "co_xo" | "admin";
-
-// ---------- Auth ----------
 
 export interface UserMe {
   id: number;
@@ -28,25 +16,13 @@ export interface UserMe {
   role: Role;
 }
 
-export const login = async (username: string, password: string): Promise<{ access_token: string }> => {
-  const { data } = await api.post<{ access_token: string; token_type: string }>("/api/auth/login", {
-    username,
-    password,
-  });
-  return data;
-};
-
-export const fetchMe = async (): Promise<UserMe> => {
-  const { data } = await api.get<UserMe>("/api/auth/me");
-  return data;
-};
-
 export type AircraftStatus = "FMC" | "PMC" | "NMC" | "NMCM" | "NMCS";
 
 export type CrewPosition =
   | "HAC" | "H2P" | "H2P_U" | "CREW_CHIEF" | "AIRCREW" | "AWS";
 
 export type DiscrepancySeverity = "MINOR" | "MAJOR" | "DOWNING";
+
 export type DiscrepancyWorkStatus = "OPEN" | "IN_WORK" | "AWP" | "AWM" | "COMPLETED" | "CLOSED";
 
 export interface PersonSummary {
@@ -177,7 +153,6 @@ export interface ReleaseForecast {
   open_work_order_count: number;
 }
 
-// backward compat alias
 export type DiscrepancyOut = Discrepancy;
 
 export interface InspectionType {
@@ -338,49 +313,6 @@ export interface DashboardSummary {
   total_hours_last_30_days: number;
 }
 
-// ---------- API functions ----------
-
-export const fetchDashboardSummary = async (): Promise<DashboardSummary> => {
-  const { data } = await api.get<DashboardSummary>("/api/dashboard/summary");
-  return data;
-};
-
-export const fetchPersons = async (role?: string): Promise<PersonSummary[]> => {
-  const { data } = await api.get<PersonSummary[]>("/api/persons", {
-    params: role ? { role } : undefined,
-  });
-  return data;
-};
-
-export const fetchPerson = async (id: number): Promise<PersonDetail> => {
-  const { data } = await api.get<PersonDetail>(`/api/persons/${id}`);
-  return data;
-};
-
-export const fetchAircraft = async (status?: string): Promise<AircraftSummary[]> => {
-  const { data } = await api.get<AircraftSummary[]>("/api/aircraft", {
-    params: status ? { status } : undefined,
-  });
-  return data;
-};
-
-export const fetchAircraftDetail = async (id: number): Promise<AircraftDetail> => {
-  const { data } = await api.get<AircraftDetail>(`/api/aircraft/${id}`);
-  return data;
-};
-
-export const fetchSorties = async (
-  params?: { date_from?: string; date_to?: string; limit?: number }
-): Promise<SortieSummary[]> => {
-  const { data } = await api.get<SortieSummary[]>("/api/sorties", { params });
-  return data;
-};
-
-export const fetchSortie = async (id: number): Promise<SortieDetail> => {
-  const { data } = await api.get<SortieDetail>(`/api/sorties/${id}`);
-  return data;
-};
-
 export interface CbrTaskOption {
   id: number;
   code: string;
@@ -406,6 +338,12 @@ export interface FlightLogActualsPayload {
   instructor_hours?: number;
   special_crew_time_hours?: number;
   syllabus_event_completed?: string | null;
+  landings_day?: number | null;
+  landings_night?: number | null;
+  landings_dve_day?: number | null;
+  landings_dve_night?: number | null;
+  landings_shipboard_day?: number | null;
+  landings_shipboard_night?: number | null;
 }
 
 export interface SortieCompletePayload {
@@ -450,24 +388,6 @@ export interface SortieCompletePayload {
   }>;
 }
 
-export const fetchCbrTaskOptions = async (): Promise<CbrTaskOption[]> => {
-  const { data } = await api.get<CbrTaskOption[]>("/api/logging/tasks/options");
-  return data;
-};
-
-export const completeSortie = async (
-  sortieId: number,
-  payload: SortieCompletePayload
-): Promise<SortieDetail> => {
-  const { data } = await api.post<SortieDetail>(
-    `/api/logging/sorties/${sortieId}/complete`,
-    payload
-  );
-  return data;
-};
-
-// ---------- Scheduling types ----------
-
 export interface FitnessWarning {
   severity: "red" | "yellow";
   message: string;
@@ -511,53 +431,6 @@ export interface FlightLogCreate {
   syllabus_event_completed?: string;
 }
 
-// ---------- Scheduling API functions ----------
-
-export const fetchUpcomingSorties = async (): Promise<SortieSummary[]> => {
-  const { data } = await api.get<SortieSummary[]>("/api/scheduling/sorties/upcoming");
-  return data;
-};
-
-export const fetchSortieFitness = async (id: number): Promise<SortieFitness> => {
-  const { data } = await api.get<SortieFitness>(`/api/scheduling/sorties/${id}/fitness`);
-  return data;
-};
-
-export const fetchEligibleCrew = async (
-  sortieId: number,
-  crewPosition: CrewPosition
-): Promise<EligibleCrewmember[]> => {
-  const { data } = await api.get<EligibleCrewmember[]>(
-    `/api/scheduling/sorties/${sortieId}/eligible-crew`,
-    { params: { crew_position: crewPosition } }
-  );
-  return data;
-};
-
-export const createSortie = async (payload: SortieCreate): Promise<SortieSummary> => {
-  const { data } = await api.post<SortieSummary>("/api/scheduling/sorties", payload);
-  return data;
-};
-
-export const assignCrew = async (
-  sortieId: number,
-  payload: FlightLogCreate
-): Promise<FlightLogOut> => {
-  const { data } = await api.post<FlightLogOut>(
-    `/api/scheduling/sorties/${sortieId}/crew`,
-    payload
-  );
-  return data;
-};
-
-export const removeCrew = async (sortieId: number, flightLogId: number): Promise<void> => {
-  await api.delete(`/api/scheduling/sorties/${sortieId}/crew/${flightLogId}`);
-};
-
-export const deleteSortie = async (id: number): Promise<void> => {
-  await api.delete(`/api/scheduling/sorties/${id}`);
-};
-
 export interface CrewSuggestionSlot {
   crew_position: CrewPosition;
   suggestions: EligibleCrewmember[];
@@ -569,21 +442,6 @@ export interface SuggestCrewResponse {
   slots: CrewSuggestionSlot[];
   conflicts: FitnessWarning[];
 }
-
-export const suggestCrew = async (sortieId: number): Promise<SuggestCrewResponse> => {
-  const { data } = await api.post<SuggestCrewResponse>(
-    `/api/scheduling/sorties/${sortieId}/suggest-crew`
-  );
-  return data;
-};
-
-export const applyCrewSuggestions = async (
-  sortieId: number,
-  payload: { person_id: number; crew_position: CrewPosition }[]
-): Promise<{ assigned: FlightLogCreate[]; skipped: string[] }> => {
-  const { data } = await api.post(`/api/scheduling/sorties/${sortieId}/apply-suggestions`, payload);
-  return data;
-};
 
 export interface ProposedCrewAssignment {
   crew_position: CrewPosition;
@@ -604,30 +462,14 @@ export interface ProposedSortie {
   warnings: FitnessWarning[];
 }
 
-export const proposeWeek = async (body: {
-  missions: {
-    event_type?: string;
-    event_code?: string;
-    aircraft_id?: number;
-    takeoff_time: string;
-    land_time?: string;
-    duration_hours?: number;
-    positions?: CrewPosition[];
-  }[];
-}): Promise<{ proposals: ProposedSortie[] }> => {
-  const { data } = await api.post<{ proposals: ProposedSortie[] }>(
-    "/api/scheduling/propose-week",
-    body
-  );
-  return data;
-};
-
-// ---------- Syllabus / Training types ----------
-
 export type SyllabusTrack = "PILOT_CORE" | "PILOT_AMCM" | "AIRCREW_CORE" | "AIRCREW_AMCM";
+
 export type GradingScheme = "FOUR_TIER" | "COMPLETION";
+
 export type GradecardStatus = "PASS" | "CONDITIONAL_PASS" | "UNSAT" | "COMPLETE" | "INCOMPLETE" | "IN_PROGRESS";
+
 export type CompletionStatus = "COMPLETE" | "INCOMPLETE";
+
 export type FourTierScore = "UNSAT_1_0" | "BELOW_STANDARD_2_0" | "STANDARD_3_0" | "EXCEPTIONAL_4_0";
 
 export interface SyllabusEventOut {
@@ -674,7 +516,6 @@ export interface GradecardLineItemResultOut {
   line_item: GradecardLineItemTemplate;
 }
 
-// Alias used in fill workflow
 export type GradecardLineItemResult = GradecardLineItemResultOut;
 
 export interface GradecardOut {
@@ -692,8 +533,6 @@ export interface GradecardOut {
   created_at: string;
   updated_at: string;
 }
-
-// ---------- Currency types ----------
 
 export interface CurrencyApplicabilityOut {
   applies_to: string;
@@ -715,111 +554,6 @@ export interface CurrencyTypeOut {
   applicability: CurrencyApplicabilityOut[];
 }
 
-// ---------- Syllabus / Training API functions ----------
-
-export const fetchSyllabusEvents = async (
-  params?: { track?: string; is_stan_eval?: boolean }
-): Promise<SyllabusEventOut[]> => {
-  const { data } = await api.get<SyllabusEventOut[]>("/api/syllabus/events", { params });
-  return data;
-};
-
-export const fetchPersonGradecards = async (personId: number): Promise<GradecardSummary[]> => {
-  const { data } = await api.get<GradecardSummary[]>(`/api/syllabus/persons/${personId}/gradecards`);
-  return data;
-};
-
-export const fetchGradecard = async (id: number): Promise<GradecardOut> => {
-  const { data } = await api.get<GradecardOut>(`/api/syllabus/gradecards/${id}`);
-  return data;
-};
-
-export const createBlankGradecard = async (body: {
-  person_id: number;
-  syllabus_event_id: number;
-  instructor_person_id?: number | null;
-  card_date: string;
-  remarks?: string | null;
-}): Promise<GradecardOut> => {
-  const { data } = await api.post<GradecardOut>("/api/syllabus/gradecards/blank", body);
-  return data;
-};
-
-export const patchGradecardLineItem = async (
-  gradecardId: number,
-  resultId: number,
-  body: {
-    four_tier_score?: FourTierScore | null;
-    completion_status?: CompletionStatus | null;
-    remarks?: string | null;
-    waived?: boolean;
-  }
-): Promise<GradecardLineItemResultOut> => {
-  const { data } = await api.patch<GradecardLineItemResultOut>(
-    `/api/syllabus/gradecards/${gradecardId}/line-items/${resultId}`,
-    body
-  );
-  return data;
-};
-
-export const patchGradecard = async (
-  gradecardId: number,
-  body: {
-    overall_status?: GradecardStatus;
-    remarks?: string | null;
-    instructor_person_id?: number | null;
-    card_date?: string;
-  }
-): Promise<GradecardOut> => {
-  const { data } = await api.patch<GradecardOut>(`/api/syllabus/gradecards/${gradecardId}`, body);
-  return data;
-};
-
-export const fetchEligibleInstructors = async (eventId: number): Promise<PersonSummary[]> => {
-  const { data } = await api.get<PersonSummary[]>(`/api/syllabus/events/${eventId}/instructors`);
-  return data;
-};
-
-// ---------- Currency API functions ----------
-
-export const fetchCurrencyTypes = async (): Promise<CurrencyTypeOut[]> => {
-  const { data } = await api.get<CurrencyTypeOut[]>("/api/currency/types");
-  return data;
-};
-
-export const fetchPersonApplicableCurrencies = async (personId: number): Promise<CurrencyTypeOut[]> => {
-  const { data } = await api.get<CurrencyTypeOut[]>(`/api/currency/types/applicable-to/${personId}`);
-  return data;
-};
-
-// ---------- Maintenance API functions ----------
-
-export const fetchAircraftInspections = async (aircraftId: number): Promise<AircraftInspection[]> => {
-  const { data } = await api.get<AircraftInspection[]>(
-    `/api/maintenance/aircraft/${aircraftId}/inspections`
-  );
-  return data;
-};
-
-export const fetchAircraftDiscrepancies = async (
-  aircraftId: number,
-  openOnly?: boolean
-): Promise<Discrepancy[]> => {
-  const { data } = await api.get<Discrepancy[]>(
-    `/api/maintenance/aircraft/${aircraftId}/discrepancies`,
-    { params: openOnly ? { open_only: true } : undefined }
-  );
-  return data;
-};
-
-export const patchDiscrepancy = async (
-  id: number,
-  body: { work_status?: DiscrepancyWorkStatus; corrective_action?: string; system_affected?: string }
-): Promise<Discrepancy> => {
-  const { data } = await api.patch<Discrepancy>(`/api/maintenance/discrepancies/${id}`, body);
-  return data;
-};
-
 export interface TrainingJacketEntry {
   sortie_id: number;
   sortie_date: string;
@@ -833,14 +567,8 @@ export interface TrainingJacketEntry {
   task_credits: Array<{ task_code: string; grade: string | null; remarks: string | null }>;
 }
 
-export const fetchPersonTrainingJacket = async (personId: number): Promise<TrainingJacketEntry[]> => {
-  const { data } = await api.get<TrainingJacketEntry[]>(
-    `/api/logging/persons/${personId}/training-jacket`
-  );
-  return data;
-};
-
 export type SafetyReportSeverity = "INFO" | "HAZARD" | "INCIDENT" | "MISHAP";
+
 export type SafetyReportStatus = "OPEN" | "UNDER_REVIEW" | "CLOSED";
 
 export interface SafetyReport {
@@ -856,15 +584,6 @@ export interface SafetyReport {
   closed_at: string | null;
 }
 
-export const fetchSafetyReportsForSortie = async (
-  sortieId: number
-): Promise<SafetyReport[]> => {
-  const { data } = await api.get<SafetyReport[]>("/api/logging/safety/reports", {
-    params: { sortie_id: sortieId },
-  });
-  return data;
-};
-
 export interface AuditLogEntry {
   id: number;
   ts: string;
@@ -878,38 +597,6 @@ export interface AuditLogEntry {
   duration_ms: number | null;
 }
 
-export const fetchAuditLog = async (params?: {
-  method?: string;
-  path_contains?: string;
-  limit?: number;
-}): Promise<AuditLogEntry[]> => {
-  const { data } = await api.get<AuditLogEntry[]>("/api/audit", { params });
-  return data;
-};
-
-export const fetchAircraftAdb = async (aircraftId: number): Promise<Discrepancy[]> => {
-  const { data } = await api.get<Discrepancy[]>(
-    `/api/logging/aircraft/${aircraftId}/adb`
-  );
-  return data;
-};
-
-export const patchInspection = async (
-  aircraftId: number,
-  inspectionId: number,
-  body: {
-    last_completed_date?: string;
-    last_completed_hours?: number;
-    last_completion_notes?: string;
-  }
-): Promise<AircraftInspection> => {
-  const { data } = await api.patch<AircraftInspection>(
-    `/api/maintenance/aircraft/${aircraftId}/inspections/${inspectionId}`,
-    body
-  );
-  return data;
-};
-
 export interface QaReleasePayload {
   qa_notes: string;
   close_discrepancy_ids?: number[];
@@ -921,92 +608,8 @@ export interface QaReleaseError {
   blockers: string[];
 }
 
-export const qaRelease = async (
-  aircraftId: number,
-  body: QaReleasePayload
-): Promise<AircraftDetail> => {
-  const { data } = await api.post<AircraftDetail>(
-    `/api/maintenance/aircraft/${aircraftId}/qa-release`,
-    body
-  );
-  return data;
-};
-
-export const fetchWorkCenters = async (): Promise<WorkCenter[]> => {
-  const { data } = await api.get<WorkCenter[]>("/api/maintenance/work-centers");
-  return data;
-};
-
-export const fetchWorkOrders = async (aircraftId: number): Promise<WorkOrder[]> => {
-  const { data } = await api.get<WorkOrder[]>(
-    `/api/maintenance/aircraft/${aircraftId}/work-orders`
-  );
-  return data;
-};
-
-export const createDiscrepancy = async (
-  aircraftId: number,
-  body: {
-    description: string;
-    severity?: DiscrepancySeverity;
-    system_affected?: string;
-    notes?: string;
-    type_wo_code?: string;
-    work_center_id?: number;
-  }
-): Promise<Discrepancy> => {
-  const { data } = await api.post<Discrepancy>(
-    `/api/maintenance/aircraft/${aircraftId}/discrepancies`,
-    body
-  );
-  return data;
-};
-
-export const patchWorkOrder = async (
-  workOrderId: number,
-  body: {
-    status?: DiscrepancyWorkStatus;
-    corrective_action?: string;
-    work_center_id?: number;
-  }
-): Promise<WorkOrder> => {
-  const { data } = await api.patch<WorkOrder>(`/api/maintenance/work-orders/${workOrderId}`, body);
-  return data;
-};
-
-export const qaSignoffWorkOrder = async (
-  workOrderId: number,
-  body: { notes: string; release_eligible?: boolean }
-): Promise<void> => {
-  await api.post(`/api/maintenance/work-orders/${workOrderId}/qa-signoff`, body);
-};
-
-export const fetchLogbook = async (aircraftId: number): Promise<LogbookEntry[]> => {
-  const { data } = await api.get<LogbookEntry[]>(
-    `/api/maintenance/aircraft/${aircraftId}/logbook`
-  );
-  return data;
-};
-
-export const fetchPhaseForecast = async (
-  weeklyFlightHours = 25
-): Promise<PhaseForecastRow[]> => {
-  const { data } = await api.get<PhaseForecastRow[]>("/api/maintenance/forecast/phase", {
-    params: { weekly_flight_hours: weeklyFlightHours },
-  });
-  return data;
-};
-
-export const fetchReleaseForecast = async (aircraftId: number): Promise<ReleaseForecast> => {
-  const { data } = await api.get<ReleaseForecast>(
-    `/api/maintenance/forecast/release/${aircraftId}`
-  );
-  return data;
-};
-
-// ---------- WTM Capability Readiness ----------
-
 export type CapabilityArea = "MOB" | "FSO" | "ASU" | "SOF" | "PR" | "STW" | "LOG" | "MIW";
+
 export type TRating = "T-1" | "T-2" | "T-3";
 
 export interface AnchorTaskStatus {
@@ -1055,32 +658,8 @@ export interface SquadronReadiness {
   aircrew: PersonReadinessSummary[];
 }
 
-export const fetchSquadronReadiness = async (): Promise<SquadronReadiness> => {
-  const { data } = await api.get<SquadronReadiness>("/api/readiness/squadron");
-  return data;
-};
-
-export const fetchPersonReadiness = async (
-  personId: number
-): Promise<PersonReadinessSummary> => {
-  const { data } = await api.get<PersonReadinessSummary>(
-    `/api/readiness/persons/${personId}`
-  );
-  return data;
-};
-
-export {
-  downloadReadinessBriefPdf,
-  downloadAtoPdf,
-  downloadBriefSheetPdf,
-  downloadGradecardPdf,
-  pdfErrorMessage,
-  PDF_UNAVAILABLE_MSG,
-} from "./pdf";
-
-// ---------- Training boards (Phase 4) ----------
-
 export type BoardType = "HAC_BOARD" | "INSTRUCTOR_BOARD" | "NATOPS_CHECK" | "STAN_EVAL";
+
 export type BoardStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
 export interface BoardSchedule {
@@ -1117,51 +696,6 @@ export interface SyllabusProgressEntry {
   gradecard_id: number | null;
   is_stan_eval: boolean;
 }
-
-export const fetchBoardSchedules = async (): Promise<BoardSchedule[]> => {
-  const { data } = await api.get<BoardSchedule[]>("/api/boards");
-  return data;
-};
-
-export const createBoardSchedule = async (
-  payload: {
-    board_type: BoardType;
-    scheduled_at: string;
-    examinee_person_id: number;
-    instructor_person_id?: number;
-    syllabus_event_id?: number;
-    location?: string;
-    remarks?: string;
-  }
-): Promise<BoardSchedule> => {
-  const { data } = await api.post<BoardSchedule>("/api/boards", payload);
-  return data;
-};
-
-export const fetchInstructorCandidates = async (params: {
-  board_type: BoardType;
-  examinee_person_id: number;
-  scheduled_at: string;
-  syllabus_event_id?: number;
-}): Promise<InstructorCandidate[]> => {
-  const { data } = await api.get<InstructorCandidate[]>("/api/boards/instructor-candidates", {
-    params,
-  });
-  return data;
-};
-
-export const fetchSyllabusProgress = async (
-  personId: number
-): Promise<SyllabusProgressEntry[]> => {
-  const { data } = await api.get<SyllabusProgressEntry[]>(
-    `/api/syllabus/persons/${personId}/progress`
-  );
-  return data;
-};
-
-
-
-// ---------- SDO ops (Phase 5) ----------
 
 export type WatchbillRole = "SDO" | "ODO" | "DUTY_PILOT" | "DUTY_AIRCREW" | "ALERT";
 
@@ -1203,29 +737,3 @@ export interface DayOps {
   sortie_count: number;
   airborne_count: number;
 }
-
-export const fetchDayOps = async (opsDate: string): Promise<DayOps> => {
-  const { data } = await api.get<DayOps>(`/api/ops/day/${opsDate}`);
-  return data;
-};
-
-export const publishSchedule = async (
-  opsDate: string,
-  body?: { published_by_person_id?: number; remarks?: string }
-): Promise<DayOps["publication"]> => {
-  const { data } = await api.post(`/api/ops/schedule/${opsDate}/publish`, body ?? {});
-  return data;
-};
-
-export const patchSortieOpsStatus = async (
-  sortieId: number,
-  body: {
-    ops_status: SortieOpsStatus;
-    mission_summary?: string;
-    comm_plan?: string;
-    brief_sheet_notes?: string;
-  }
-): Promise<void> => {
-  await api.patch(`/api/ops/sorties/${sortieId}/status`, body);
-};
-

@@ -2,7 +2,9 @@
 Logbook computation service.
 Keeps totals math out of the route handler.
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
+
+from app.core.time import utc_now
 
 _ALL_APPROACH_TYPES = ["ILS", "GPS", "RNAV", "TACAN", "VOR", "PAR", "ASR", "ENROUTE"]
 
@@ -87,7 +89,7 @@ def build_window_totals(all_logs: list) -> dict:
     Compute the four fixed-window totals (career / 365d / 90d / 30d).
     Windows are always relative to now — independent of any user filter.
     """
-    now = datetime.utcnow()
+    now = utc_now()
 
     def _after(cutoff):
         return [

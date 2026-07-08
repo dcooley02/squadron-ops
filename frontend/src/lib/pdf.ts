@@ -1,5 +1,5 @@
 import type { AxiosError } from "axios";
-import { api } from "./api";
+import { api } from "./api/client";
 
 export const PDF_UNAVAILABLE_MSG =
   "PDF export is unavailable. Install WeasyPrint on the server (pip install weasyprint) and restart the API.";

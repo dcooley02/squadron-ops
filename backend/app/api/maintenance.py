@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import asc, nullslast
 from typing import List
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from app.core.deps import get_current_user, require_roles
 from app.database import get_db
@@ -55,6 +55,7 @@ from app.services.maintenance_chain import (
 )
 from app.services.maintenance_forecast import phase_forecast, release_forecast
 from app.services.qa_release import qa_release
+from app.core.time import utc_now
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance"])
 
@@ -220,7 +221,7 @@ def patch_work_order(
 
     if body.work_center_id is not None:
         wo.work_center_id = body.work_center_id
-        wo.assigned_at = datetime.utcnow()
+        wo.assigned_at = utc_now()
     if body.status is not None:
         update_work_order_status(db, wo, body.status, corrective_action=body.corrective_action)
     elif body.corrective_action is not None:
@@ -382,7 +383,7 @@ def update_discrepancy(
             disc.work_status = body.work_status
             if body.work_status == DiscrepancyWorkStatus.CLOSED:
                 disc.is_open = False
-                disc.closed_date = datetime.utcnow()
+                disc.closed_date = utc_now()
     if body.system_affected is not None:
         disc.system_affected = body.system_affected
     if body.corrective_action is not None and not disc.work_order:
@@ -474,12 +475,17 @@ def aircraft_qa_release(
         body = body.model_copy(update={"inspector_person_id": user.id})
 
     try:
-        return qa_release(db, aircraft_id, body)
+        detail = qa_release(db, aircraft_id, body)
+        db.commit()
+        return detail
     except LookupError as exc:
+        db.rollback()
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except PermissionError as exc:
+        db.rollback()
         raise HTTPException(
             status_code=409,
             detail={"message": "Release blocked — not safe for flight", "blockers": list(exc.args[0])},

@@ -1,9 +1,8 @@
-from datetime import date, datetime
+from datetime import date
 
 import pytest
 
 from app.models.models import (
-    Aircraft,
     AircraftInspection,
     AircraftStatus,
     Discrepancy,
@@ -13,6 +12,7 @@ from app.models.models import (
 )
 from app.schemas.aircraft import QaReleaseRequest
 from app.services.qa_release import collect_release_blockers, qa_release
+from app.core.time import utc_now
 
 
 def _add_disc(db, aircraft, severity, work_status):
@@ -22,7 +22,7 @@ def _add_disc(db, aircraft, severity, work_status):
         severity=severity,
         work_status=work_status,
         is_open=work_status != DiscrepancyWorkStatus.CLOSED,
-        opened_date=datetime.utcnow(),
+        opened_date=utc_now(),
     )
     db.add(disc)
     db.flush()

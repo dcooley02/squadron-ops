@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from app.models.models import FlightLog, Person, Sortie
 from app.schemas.logging import LogbookFiltersApplied
 from app.services.logbook import build_window_totals
+from app.core.time import utc_now
 
 _TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
 _TEMPLATE_NAME = "logbook.html"
@@ -227,7 +228,7 @@ def render_logbook_pdf(
         person=person,
         pages=pages,
         watermark=watermark,
-        generated_at=datetime.utcnow().strftime("%d %b %Y").upper(),
+        generated_at=utc_now().strftime("%d %b %Y").upper(),
     )
 
     pdf_bytes = WeasyprintHTML(

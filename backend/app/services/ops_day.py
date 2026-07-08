@@ -13,6 +13,7 @@ from app.models.models import (
     SortieOpsStatus,
     WatchbillEntry,
 )
+from app.core.time import utc_now
 
 
 def _sorties_for_day(db: Session, day: date) -> List[Sortie]:
@@ -122,7 +123,7 @@ def publish_schedule(
 
     pub = SchedulePublication(
         schedule_date=day,
-        published_at=datetime.utcnow(),
+        published_at=utc_now(),
         published_by_person_id=published_by_person_id,
         remarks=remarks,
     )
@@ -135,6 +136,6 @@ def publish_schedule(
             s.ops_status = SortieOpsStatus.PUBLISHED
         s.schedule_publication_id = pub.id
 
-    db.commit()
+    db.flush()
     db.refresh(pub)
     return pub

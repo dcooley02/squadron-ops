@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, List, Literal
 from app.models.models import CrewPosition

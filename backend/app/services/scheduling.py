@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 
 from app.models.models import (
-    Person, Sortie, FlightLog, Qualification, Currency, SyllabusEvent,
+    Person, Sortie, FlightLog, SyllabusEvent,
     Role, CrewPosition, AircraftStatus,
 )
 from app.schemas.scheduling import (
@@ -22,6 +22,7 @@ from app.schemas.scheduling import (
     ProposedCrewAssignment,
     ProposeWeekResponse,
 )
+from app.core.time import utc_now
 
 
 # ─── Low-level helpers ────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ def has_current_currency(person: Person, currency_code: str, on_date: date) -> b
 
 def hours_flown_last_30_days(db: Session, person_id: int) -> float:
     """Total logged hours for person over the last 30 days of completed sorties."""
-    cutoff = datetime.utcnow() - timedelta(days=30)
+    cutoff = utc_now() - timedelta(days=30)
     result = (
         db.query(func.sum(FlightLog.hours_logged))
         .join(Sortie, FlightLog.sortie_id == Sortie.id)
@@ -135,7 +136,7 @@ def get_eligible_crew(
         completed_by_person.setdefault(person_id, set()).add(code)
 
     # Pre-fetch hours in last 30 days per person (one query)
-    cutoff_dt = datetime.utcnow() - timedelta(days=30)
+    cutoff_dt = utc_now() - timedelta(days=30)
     hours_rows = (
         db.query(FlightLog.person_id, func.sum(FlightLog.hours_logged))
         .join(Sortie, FlightLog.sortie_id == Sortie.id)
@@ -397,7 +398,7 @@ def compute_fitness(db: Session, sortie_id: int) -> Optional[SortieFitness]:
 
 
 def _sortie_window(sortie: Sortie) -> tuple[datetime, datetime]:
-    start = sortie.takeoff_time or datetime.utcnow()
+    start = sortie.takeoff_time or utc_now()
     end = sortie.land_time
     if not end or end <= start:
         end = start + timedelta(hours=sortie.duration_hours or 2.0)

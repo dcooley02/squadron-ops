@@ -6,9 +6,8 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.models.models import (
-    Sortie, FlightLog, CbrTaskOption, SortieTaskCredit,
-    SafetyReport, Discrepancy, Person, SortieTmrCode,
-    CapabilityArea, DiscrepancySeverity, CrewPosition, FlightMode,
+    Sortie, FlightLog, CbrTaskOption, SafetyReport, Discrepancy, Person, SortieTmrCode,
+    CapabilityArea, CrewPosition, FlightMode,
 )
 from app.api.sorties import _log_out
 from app.schemas.logging import (
@@ -17,7 +16,7 @@ from app.schemas.logging import (
     UnscheduledSortiePayload,
     SafetyReportCreate, SafetyReportOut,
     TrainingJacketEntry, TrainingJacketTaskEntry,
-    ApproachEntry, LogbookEntry, LogbookTotals, LogbookWindowTotals,
+    ApproachEntry, LogbookEntry, LogbookWindowTotals,
     LogbookFiltersApplied, LogbookPersonOut, LogbookResponse,
     LogbookTmrOut,
     SortieTmrOut,
@@ -93,20 +92,18 @@ def complete_sortie_endpoint(
     Close out a completed sortie: update times/hours, assign task credits,
     refresh currencies, update aircraft hours, file discrepancies and safety reports.
     """
-    # Pre-check existence and completion state before entering the service
-    existing = db.query(Sortie.id, Sortie.is_complete).filter(Sortie.id == sortie_id).first()
-    if not existing:
-        raise HTTPException(status_code=404, detail=f"Sortie {sortie_id} not found")
-    if existing.is_complete:
-        raise HTTPException(status_code=400, detail=f"Sortie {sortie_id} is already complete")
-
     try:
         sortie = complete_sortie(db, sortie_id, payload)
+        db.commit()
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        db.rollback()
+        msg = str(exc)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=404, detail=msg) from exc
+        raise HTTPException(status_code=400, detail=msg) from exc
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Completion failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Completion failed") from exc
 
     loaded = _load_sortie_full(db, sortie.id)
     return _sortie_detail(loaded)
@@ -125,11 +122,13 @@ def create_unscheduled(
     """
     try:
         sortie = create_and_complete_unscheduled(db, payload)
+        db.commit()
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Creation failed: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Creation failed") from exc
 
     loaded = _load_sortie_full(db, sortie.id)
     return _sortie_detail(loaded)

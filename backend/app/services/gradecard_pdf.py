@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.models import Gradecard, GradecardLineItemResult, Person, SyllabusEvent
+from app.models.models import Gradecard, GradecardLineItemResult, SyllabusEvent
 
 _TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
 

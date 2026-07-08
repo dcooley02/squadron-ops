@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,133 +8,28 @@ import {
   fetchCbrTaskOptions,
   completeSortie as completeSortieApi,
   type SortieCompletePayload,
-  type FlightLogActualsPayload,
 } from "../lib/api";
 import Loading from "../components/Loading";
 import Badge from "../components/Badge";
-
-// ── Local row types for dynamic lists ─────────────────────────────────────────
-
-type FlightMode = "LIVE" | "SIM_TOFT";
-type Severity = "MINOR" | "MAJOR" | "DOWNING";
-type Grade = "Q" | "CQ" | "U" | "NO" | "NG";
-type SafetyLevel = "INFO" | "HAZARD" | "INCIDENT" | "MISHAP";
-
-let _seq = 0;
-const uid = () => String(++_seq);
-
-interface CrewActual {
-  flight_log_id: number;
-  person_name: string;
-  crew_position: string;
-  hours_logged: string;
-  night_hours: string;
-  nvg_hours: string;
-  actual_instrument_hours: string;
-}
-
-function roleHoursForPosition(position: string, hours: number) {
-  switch (position) {
-    case "HAC":
-      return { ac_commander_hours: hours, first_pilot_hours: hours };
-    case "H2P":
-    case "H2P_U":
-      return { copilot_hours: hours };
-    case "CREW_CHIEF":
-    case "AIRCREW":
-    case "AWS":
-      return { special_crew_time_hours: hours };
-    default:
-      return {};
-  }
-}
-
-function buildFlightLogActuals(
-  crewActuals: CrewActual[],
-  mission: { nightH: string; nvgH: string; instrH: string },
-  eventCode: string | null | undefined
-): FlightLogActualsPayload[] {
-  return crewActuals.map((c) => {
-    const hours = parseFloat(c.hours_logged) || 0;
-    const night = parseFloat(c.night_hours) || parseFloat(mission.nightH) || 0;
-    const nvg = parseFloat(c.nvg_hours) || parseFloat(mission.nvgH) || 0;
-    const instr = parseFloat(c.actual_instrument_hours) || parseFloat(mission.instrH) || 0;
-    return {
-      flight_log_id: c.flight_log_id,
-      hours_logged: hours,
-      total_hours: hours,
-      night_hours: night,
-      nvg_hours: nvg,
-      actual_instrument_hours: instr,
-      syllabus_event_completed: eventCode || null,
-      ...roleHoursForPosition(c.crew_position, hours),
-    };
-  });
-}
-
-interface TaskCreditRow {
-  _key: string;
-  person_id: string;
-  task_code: string;
-  grade: Grade;
-  remarks: string;
-}
-
-interface DiscrepancyRow {
-  _key: string;
-  description: string;
-  severity: Severity;
-  system_affected: string;
-  notes: string;
-}
-
-interface SafetyRow {
-  _key: string;
-  severity: SafetyLevel;
-  category: string;
-  description: string;
-  actions_taken: string;
-}
-
-// ── Datetime helpers ──────────────────────────────────────────────────────────
-
-function toInputDT(iso: string | null): string {
-  return iso ? iso.slice(0, 16) : "";
-}
-
-function addHoursToStr(dtStr: string, hours: number): string {
-  if (!dtStr) return "";
-  const [datePart, timePart] = dtStr.split("T");
-  const [h, m] = timePart.split(":").map(Number);
-  const totalMins = h * 60 + m + Math.round(hours * 60);
-  const dayBump = Math.floor(totalMins / 1440);
-  const rem = totalMins % 1440;
-  const newH = Math.floor(rem / 60);
-  const newM = rem % 60;
-  let newDate = datePart;
-  if (dayBump > 0) {
-    const [y, mo, d] = datePart.split("-").map(Number);
-    const next = new Date(y, mo - 1, d + dayBump);
-    newDate = [
-      next.getFullYear(),
-      String(next.getMonth() + 1).padStart(2, "0"),
-      String(next.getDate()).padStart(2, "0"),
-    ].join("-");
-  }
-  return `${newDate}T${String(newH).padStart(2, "0")}:${String(newM).padStart(2, "0")}`;
-}
-
-function durationBetween(t: string, l: string): number {
-  if (!t || !l) return 0;
-  const parse = (s: string) => {
-    const [date, time] = s.split("T");
-    const [y, mo, d] = date.split("-").map(Number);
-    const [h, m] = time.split(":").map(Number);
-    return new Date(y, mo - 1, d, h, m).getTime();
-  };
-  const diffH = (parse(l) - parse(t)) / 3_600_000;
-  return Math.max(0, Math.round(diffH * 10) / 10);
-}
+import {
+  uid,
+  buildFlightLogActuals,
+  CREW_LANDING_FIELDS,
+  emptyCrewLandings,
+  hasPerCrewLandings,
+  sumCrewLandings,
+  toInputDT,
+  addHoursToStr,
+  durationBetween,
+  type FlightMode,
+  type Grade,
+  type Severity,
+  type SafetyLevel,
+  type CrewActual,
+  type TaskCreditRow,
+  type DiscrepancyRow,
+  type SafetyRow,
+} from "./completeSortie/helpers";
 
 // ── Collapsible section ───────────────────────────────────────────────────────
 
@@ -221,12 +116,11 @@ export default function CompleteSortie() {
   const [discCompact, setDiscCompact] = useState(true);
   const [debriefNotes, setDebriefNotes] = useState("");
   const [safetyRows, setSafetyRows] = useState<SafetyRow[]>([]);
-  const [initialized, setInitialized] = useState(false);
+  const [initializedSortieId, setInitializedSortieId] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // ── Pre-fill when sortie loads ────────────────────────────────────────────
-  useEffect(() => {
-    if (!sortie || initialized) return;
+  // ── Pre-fill when sortie loads (adjust state during render — React recommended pattern)
+  if (sortie && initializedSortieId !== sortie.id) {
     const defDur = sortie.duration_hours ?? 2.0;
     const defDurStr = defDur.toFixed(1);
 
@@ -237,9 +131,6 @@ export default function CompleteSortie() {
       : "";
     const landStr = toStr ? addHoursToStr(toStr, defDur) : "";
 
-    setTakeoff(toStr);
-    setLand(landStr);
-    setDuration(defDurStr);
     const isNvgMission = sortie.event_type?.toUpperCase().includes("NVG") ?? false;
     const takeoffHour = sortie.takeoff_time
       ? parseISO(sortie.takeoff_time).getHours()
@@ -248,6 +139,10 @@ export default function CompleteSortie() {
     const defaultNight = isNvgMission || isNightMission ? defDurStr : "0.0";
     const defaultNvg = isNvgMission ? defDurStr : "0.0";
 
+    setInitializedSortieId(sortie.id);
+    setTakeoff(toStr);
+    setLand(landStr);
+    setDuration(defDurStr);
     setDayH(isNvgMission || isNightMission ? "0.0" : defDurStr);
     setNightH(defaultNight);
     setNvgH(defaultNvg);
@@ -261,10 +156,10 @@ export default function CompleteSortie() {
         night_hours: defaultNight,
         nvg_hours: defaultNvg,
         actual_instrument_hours: "0.0",
+        ...emptyCrewLandings(),
       }))
     );
-    setInitialized(true);
-  }, [sortie, initialized]);
+  }
 
   // ── Time change handlers (auto-compute duration) ──────────────────────────
   function onTakeoffChange(v: string) {
@@ -305,13 +200,21 @@ export default function CompleteSortie() {
           .filter(([, v]) => v !== "")
           .map(([k, v]) => [k, parseFloat(v)])
       );
+      // Prefer per-crew landings when any crew landing field is filled; else sortie-level activity.
+      const landingKeys = new Set<string>(CREW_LANDING_FIELDS);
+      const useCrewLandings = hasPerCrewLandings(crewActuals);
+      const filteredActivity = Object.fromEntries(
+        Object.entries(activityFields).filter(([k]) => !(useCrewLandings && landingKeys.has(k)))
+      );
+      const crewLandingTotals = useCrewLandings ? sumCrewLandings(crewActuals) : null;
       const payload: SortieCompletePayload = {
         actual_takeoff_time: takeoff + ":00",
         actual_land_time: land + ":00",
         duration_hours: dur,
         flight_mode: flightMode,
         debrief_notes: debriefNotes || null,
-        ...activityFields,
+        ...filteredActivity,
+        ...(crewLandingTotals ?? {}),
         flight_log_actuals: buildFlightLogActuals(
           crewActuals,
           { nightH, nvgH, instrH },
@@ -602,6 +505,42 @@ export default function CompleteSortie() {
                     </div>
                   ))}
                 </div>
+                <div className="pl-1">
+                  <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">
+                    Landings (per crew)
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {(
+                      [
+                        ["Day", "landings_day"],
+                        ["Night", "landings_night"],
+                        ["DVE Day", "landings_dve_day"],
+                        ["DVE Nt", "landings_dve_night"],
+                        ["Ship Day", "landings_shipboard_day"],
+                        ["Ship Nt", "landings_shipboard_night"],
+                      ] as const
+                    ).map(([label, field]) => (
+                      <div key={field}>
+                        <Lbl>{label}</Lbl>
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={ca[field]}
+                          onChange={(e) =>
+                            setCrewActuals((prev) =>
+                              prev.map((c, j) =>
+                                j === i ? { ...c, [field]: e.target.value } : c
+                              )
+                            )
+                          }
+                          className={INPUT_CLS}
+                          placeholder="0"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -617,16 +556,31 @@ export default function CompleteSortie() {
           ) : null
         }
       >
+        {hasPerCrewLandings(crewActuals) ? (
+          <p className="text-xs text-slate-500">
+            Sortie landing totals will be summed from per-crew landings above.
+            Enter hoist / weapons / AMCM below as needed.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500 mb-2">
+            Optional: enter landings per crewmember above, or sortie-level landings here
+            (mirrored to HAC if no per-crew values).
+          </p>
+        )}
         {[
-          {
-            label: "Landings",
-            fields: [
-              { key: "landings_day", label: "Day" },
-              { key: "landings_night", label: "Night" },
-              { key: "landings_dve_day", label: "DVE Day" },
-              { key: "landings_dve_night", label: "DVE Night" },
-            ],
-          },
+          ...(hasPerCrewLandings(crewActuals)
+            ? []
+            : [
+                {
+                  label: "Landings (sortie-level)",
+                  fields: [
+                    { key: "landings_day", label: "Day" },
+                    { key: "landings_night", label: "Night" },
+                    { key: "landings_dve_day", label: "DVE Day" },
+                    { key: "landings_dve_night", label: "DVE Night" },
+                  ],
+                },
+              ]),
           {
             label: "Hoist",
             fields: [
