@@ -29,10 +29,33 @@ from app.models.models import (
 )
 from app.core.time import utc_now
 
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql+psycopg://squadron_ops:changeme@localhost:5433/squadron_ops_test",
-)
+def _load_repo_dotenv() -> None:
+    from pathlib import Path
+
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    if not env_path.is_file():
+        return
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_repo_dotenv()
+
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
+if not TEST_DATABASE_URL:
+    # Derive from DATABASE_URL when only the main DB URL is configured.
+    base = os.getenv("DATABASE_URL")
+    if base and base.rsplit("/", 1)[-1]:
+        TEST_DATABASE_URL = base.rsplit("/", 1)[0] + "/squadron_ops_test"
+    else:
+        raise RuntimeError(
+            "TEST_DATABASE_URL is not set. Copy .env.example to .env and configure credentials."
+        )
+
 
 
 def _ensure_test_database() -> None:

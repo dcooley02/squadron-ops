@@ -1,15 +1,19 @@
 # Squadron Ops — local PostgreSQL for development and demonstration.
 # Application (API + frontend) runs on the host; only the database is containerized.
+# Copy .env.example to .env and set a strong POSTGRES_PASSWORD before starting.
 services:
   db:
     image: postgres:16
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: squadron_ops
-      POSTGRES_PASSWORD: changeme
-      POSTGRES_DB: squadron_ops
+      POSTGRES_USER: ${POSTGRES_USER:-squadron_ops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-squadron_ops}
     ports:
-      - "5433:5432"
+      # Localhost only — do not expose on LAN
+      - "127.0.0.1:5433:5432"
     volumes:
       - squadron_ops_db:/var/lib/postgresql/data
 
