@@ -79,6 +79,8 @@ Open **http://localhost:5174/login**
 | `admin` | Admin | Audit log |
 
 > **Demo credentials:** password `demo1234` for all seeded accounts. These exist only for local demonstration — never use in production.
+>
+> Local demo uses a built-in JWT secret (`ENVIRONMENT=development` by default). Before any internet-facing deploy, set `ENVIRONMENT=production` and a strong `SECRET_KEY` (see `.env.example`); the API will refuse to start with the demo secret or with `DEMO_OPEN_RBAC=true`.
 
 **Guided walkthrough:** [docs/DEMO_WALKTHROUGH.md](docs/DEMO_WALKTHROUGH.md) (12 minutes)  
 **Quick reference:** [docs/DEMO_QUICK_REFERENCE.md](docs/DEMO_QUICK_REFERENCE.md)

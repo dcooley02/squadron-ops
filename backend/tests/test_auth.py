@@ -1,6 +1,8 @@
+import pytest
 from passlib.hash import bcrypt as bc
+from pydantic import ValidationError
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.models.models import Person, Role
 
 
@@ -96,5 +98,44 @@ def test_maint_write_forbidden_for_pilot(client, db, aircraft, monkeypatch):
             },
         )
         assert resp.status_code == 403
+    finally:
+        get_settings.cache_clear()
+
+
+def test_production_rejects_default_secret_key(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("SECRET_KEY", "squadron-ops-demo-secret-change-in-production")
+    monkeypatch.delenv("DEMO_OPEN_RBAC", raising=False)
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(ValidationError) as exc:
+            Settings()
+        assert "SECRET_KEY" in str(exc.value)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_production_rejects_demo_open_rbac(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("SECRET_KEY", "unit-test-production-secret-key-32chars")
+    monkeypatch.setenv("DEMO_OPEN_RBAC", "true")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(ValidationError) as exc:
+            Settings()
+        assert "DEMO_OPEN_RBAC" in str(exc.value)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_production_accepts_strong_secret(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("SECRET_KEY", "unit-test-production-secret-key-32chars")
+    monkeypatch.setenv("DEMO_OPEN_RBAC", "false")
+    get_settings.cache_clear()
+    try:
+        settings = Settings()
+        assert settings.environment == "production"
+        assert settings.secret_key.startswith("unit-test-")
     finally:
         get_settings.cache_clear()

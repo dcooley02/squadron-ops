@@ -13,6 +13,7 @@ Squadron Ops is a portfolio demonstration platform. The following limitations ar
 - Not every write route is fully role-scoped yet (e.g. sortie complete is any authenticated user) — expand as product needs demand
 - Admin “password reset” sets the person to the configured demo password — not a real recovery flow
 - Demo password (`demo1234`) and default JWT secret are for local use only; never deploy with repository defaults
+- Setting `ENVIRONMENT=production` refuses the demo JWT secret and refuses `DEMO_OPEN_RBAC=true` (startup ValidationError)
 - Password reset as a product feature is not implemented
 
 ---
