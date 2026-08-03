@@ -64,6 +64,7 @@ Squadron Ops is a portfolio demonstration platform. The following limitations ar
 - Timestamps use `app.core.time.utc_now()` (naive UTC wall clock for TIMESTAMP WITHOUT TIME ZONE); prefer this over deprecated `datetime.utcnow()`
 - Frontend API base URL defaults to `http://localhost:8001`; override with `VITE_API_BASE_URL` (see `frontend/.env.example`)
 - Demo seed lives in `backend/seed/` package (shim `backend/seed.py` → `seed.run.main()`); Complete Sortie and Aircraft Maintenance are thin shells with panels under `completeSortie/` and `aircraftMaintenance/` (Phase E). Large service/catalog modules (`flight_completion`, `cbr_enclosure2`, `scheduling`) remain intentional
+- **Responsive shell (Phase F):** drawer nav below Tailwind `md` (768px); permanent sidebar on desktop. Demo-on-phone credibility for Login / Dashboard / Complete Sortie / Aircraft Maintenance and list pages (Maintenance, Sorties, Crew, Readiness). Not full phone-first redesign; TV boards and admin/edge pages are not optimized for small phones
 - Transaction ownership: domain services flush; routes commit (Phase B) — audit middleware still owns its own session
 - Frontend unit tests are smoke-level (Vitest); no browser e2e suite yet
 - Automated backend suite: **54** pytest integration tests (PostgreSQL required on port 5433)

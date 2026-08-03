@@ -21,12 +21,25 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   Admin: Settings,
 };
 
-export default function Sidebar() {
+export type SidebarProps = {
+  /** Called after nav link click or sign-out (closes mobile drawer). */
+  onNavigate?: () => void;
+  className?: string;
+  id?: string;
+};
+
+export default function Sidebar({ onNavigate, className, id }: SidebarProps) {
   const { user, logout } = useAuth();
   const visible = user ? NAV_ITEMS.filter((item) => canSeeNav(user.role, item)) : [];
 
   return (
-    <aside className="w-56 bg-slate-900 border-r border-slate-800 flex flex-col">
+    <aside
+      id={id}
+      className={clsx(
+        "h-full w-56 bg-slate-900 border-r border-slate-800 flex flex-col",
+        className
+      )}
+    >
       <div className="p-4 border-b border-slate-800">
         <h1 className="text-base font-semibold tracking-tight">HSC Squadron Ops</h1>
         <p className="text-xs text-slate-500 mt-0.5">MH-60S Operations</p>
@@ -38,7 +51,7 @@ export default function Sidebar() {
           </p>
         )}
       </div>
-      <nav className="flex-1 p-2 space-y-0.5">
+      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
         {visible.map(({ to, label }) => {
           const Icon = ICONS[label] ?? LayoutDashboard;
           return (
@@ -46,9 +59,10 @@ export default function Sidebar() {
               key={to}
               to={to}
               end={to === "/"}
+              onClick={() => onNavigate?.()}
               className={({ isActive }) =>
                 clsx(
-                  "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                  "flex items-center gap-2 px-3 py-2.5 min-h-10 rounded-md text-sm transition-colors",
                   isActive
                     ? "bg-slate-800 text-white"
                     : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
@@ -63,9 +77,10 @@ export default function Sidebar() {
         {user && (
           <NavLink
             to={`/crew/${user.id}`}
+            onClick={() => onNavigate?.()}
             className={({ isActive }) =>
               clsx(
-                "flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors",
+                "flex items-center gap-2 px-3 py-2.5 min-h-10 rounded-md text-sm transition-colors",
                 isActive
                   ? "bg-slate-800 text-white"
                   : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
@@ -79,8 +94,12 @@ export default function Sidebar() {
       </nav>
       <div className="p-2 border-t border-slate-800">
         <button
-          onClick={logout}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+          type="button"
+          onClick={() => {
+            logout();
+            onNavigate?.();
+          }}
+          className="flex items-center gap-2 w-full px-3 py-2.5 min-h-10 rounded-md text-sm text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
         >
           <LogOut size={16} />
           Sign out

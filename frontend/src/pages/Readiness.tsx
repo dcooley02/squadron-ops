@@ -71,7 +71,7 @@ export default function Readiness() {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         {AREA_ORDER.map((code) => {
           const area = data.areas.find((a) => a.capability_area === code);
           if (!area) return null;
@@ -228,50 +228,52 @@ function AreaPilotTable({
   showAnchors?: boolean;
 }) {
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
-          <th className="font-medium py-1.5 pr-3">Pilot</th>
-          <th className="font-medium py-1.5 pr-3">Rating</th>
-          <th className="font-medium py-1.5">Contributing factors</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.persons.map((p) => {
-          const row = p.areas.find((a) => a.capability_area === area);
-          if (!row) return null;
-          return (
-            <tr key={p.person_id} className="border-t border-slate-800/60">
-              <td className="py-2 pr-3 align-top">
-                <Link to={`/crew/${p.person_id}`} className="text-blue-400 hover:text-blue-300">
-                  {p.person_name}
-                </Link>
-              </td>
-              <td className="py-2 pr-3 align-top">
-                <TRatingBadge rating={row.rating} />
-              </td>
-              <td className="py-2 text-xs text-slate-400">
-                {row.contributing_factors.length === 0 ? (
-                  <span className="text-green-400/80">All anchor tasks current</span>
-                ) : (
-                  <ul className="list-disc list-inside space-y-0.5">
-                    {row.contributing_factors.map((f, i) => (
-                      <li key={i}>{f}</li>
-                    ))}
-                  </ul>
-                )}
-                {showAnchors && (
-                  <AnchorTaskList
-                    anchors={row.anchor_tasks}
-                    t1Window={row.t1_window_days}
-                    t2Window={row.t2_window_days}
-                  />
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto min-w-0">
+      <table className="w-full text-sm min-w-[28rem]">
+        <thead>
+          <tr className="text-left text-xs text-slate-500 uppercase tracking-wide">
+            <th className="font-medium py-1.5 pr-3">Pilot</th>
+            <th className="font-medium py-1.5 pr-3">Rating</th>
+            <th className="font-medium py-1.5">Contributing factors</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.persons.map((p) => {
+            const row = p.areas.find((a) => a.capability_area === area);
+            if (!row) return null;
+            return (
+              <tr key={p.person_id} className="border-t border-slate-800/60">
+                <td className="py-2 pr-3 align-top">
+                  <Link to={`/crew/${p.person_id}`} className="text-blue-400 hover:text-blue-300">
+                    {p.person_name}
+                  </Link>
+                </td>
+                <td className="py-2 pr-3 align-top">
+                  <TRatingBadge rating={row.rating} />
+                </td>
+                <td className="py-2 text-xs text-slate-400">
+                  {row.contributing_factors.length === 0 ? (
+                    <span className="text-green-400/80">All anchor tasks current</span>
+                  ) : (
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {row.contributing_factors.map((f, i) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {showAnchors && (
+                    <AnchorTaskList
+                      anchors={row.anchor_tasks}
+                      t1Window={row.t1_window_days}
+                      t2Window={row.t2_window_days}
+                    />
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

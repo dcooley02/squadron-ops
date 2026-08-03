@@ -51,8 +51,8 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-md space-y-6">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-md space-y-6 min-w-0">
         <div className="text-center">
           <h1 className="text-xl font-semibold text-slate-100">HSC Squadron Ops</h1>
           <p className="text-sm text-slate-500 mt-1">Sign in to continue</p>
@@ -65,7 +65,7 @@ export default function Login() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+              className="w-full min-h-10 rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
               autoComplete="username"
               required
             />
@@ -76,7 +76,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
+              className="w-full min-h-10 rounded bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-100"
               autoComplete="current-password"
               required
             />
@@ -85,7 +85,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-2 rounded bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+            className="w-full min-h-10 py-2.5 rounded bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
           >
             {submitting ? "Signing in…" : "Sign in"}
           </button>
@@ -102,7 +102,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setUsername(a.username)}
-                  className="w-full text-left text-sm hover:bg-slate-800/50 rounded px-2 py-1.5 -mx-2"
+                  className="w-full text-left text-sm hover:bg-slate-800/50 rounded px-2 py-2.5 min-h-10 -mx-2"
                 >
                   <span className="text-slate-200 font-medium">{a.label}</span>
                   <span className="text-slate-500 ml-2 font-mono text-xs">{a.username}</span>

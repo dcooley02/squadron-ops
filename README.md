@@ -188,6 +188,8 @@ Phases A–E engineering work is complete for the portfolio demo. Next engineeri
 
 **Module map:** [docs/MODULE_MAP.md](docs/MODULE_MAP.md) — domain index, cascade entry points, extension recipes, demo/verify path.
 
+**Responsive shell (Phase F):** permanent sidebar on desktop (`md`+); hamburger + overlay drawer on smaller viewports for demo-on-phone walkthroughs. Not a full mobile redesign of every page.
+
 See [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) for API surface, data model, and capability inventory.
 
 ---

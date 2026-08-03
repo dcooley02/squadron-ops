@@ -2,7 +2,7 @@
 
 Canonical **structure map** for reviewers and contributors: domains, layer cake, cascade entry points, extension recipes, and demo/verify path.
 
-This map reflects the **post Phase E** tree: seed package + shim, Complete Sortie panels, and Aircraft Maintenance sections/modals. Paths match the current repository.
+This map reflects the **post Phase E/F** tree: seed package + shim, Complete Sortie / Aircraft Maintenance panels, and responsive shell (drawer nav &lt; `md`). Paths match the current repository.
 
 Related: [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) (cascade detail), [LIMITATIONS.md](LIMITATIONS.md), [ROADMAP.md](../ROADMAP.md), [README.md](../README.md).
 
@@ -16,11 +16,11 @@ Related: [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) (cascade detail), [LIMITATIO
 | Community | HSC / MH-60S (designed to extend to other Navy aviation communities) |
 | Tenancy | **Single squadron**; multi-squadron deferred |
 | Data | Unclassified **synthetic** only |
-| UI | **Desktop-primary** chrome (sidebar, dense boards) |
-| Mobile | **Phase F** (responsive / mobile-friendly) — after Phase E; see [ROADMAP.md](../ROADMAP.md) |
-| Risk bar | Strict behavior freeze during Phase E modularity work |
+| UI | **Desktop-primary** (≥ `md` permanent sidebar); dense boards/forms |
+| Mobile | **Phase F done** — hamburger + overlay drawer &lt; `md`; demo paths at ~390px (Login, Dashboard, Complete Sortie, Aircraft Maintenance + Maintenance/Sorties/Crew/Readiness). Not full phone-first parity. Spec: [phase-f design](superpowers/specs/2026-08-03-phase-f-responsive-mobile-design.md) |
+| Risk bar | Phase E was behavior-freeze modularity; Phase F is intentional UI chrome/reflow only |
 
-Phases A–E are done for demo scope (quality bar, RBAC, cascade integrity, module splits, Enclosure 2-shaped CBR catalog, Appendix D fixtures, per-crew landings, reviewer modularity). Phase E was docs + extract-in-place structure only — no new domain features.
+Phases A–F are done for demo scope (quality bar, RBAC, cascade integrity, module splits, Enclosure 2-shaped CBR catalog, Appendix D fixtures, per-crew landings, reviewer modularity, responsive shell).
 
 ---
 

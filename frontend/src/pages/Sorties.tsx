@@ -79,8 +79,8 @@ export default function Sorties() {
         ))}
       </div>
 
-      <div className="card p-0 overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="card p-0 overflow-x-auto">
+        <table className="w-full text-sm min-w-[36rem]">
           <thead className="bg-slate-900/60 text-xs uppercase tracking-wide text-slate-400">
             <tr>
               <th className="text-left px-4 py-2 font-medium">Date</th>

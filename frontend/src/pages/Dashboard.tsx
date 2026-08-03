@@ -182,7 +182,7 @@ export default function Dashboard() {
               {" "}({stampedFmcRate.toFixed(0)}%)
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:col-span-2 min-w-0">
             <MetricCard
               label="Total Aircraft"
               value={data.aircraft_total}
@@ -193,7 +193,7 @@ export default function Dashboard() {
               value={fmcCount}
               variant="good"
             />
-            <div className="col-span-2 grid grid-cols-3 gap-3">
+            <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
               <MetricCard
                 label="Computed PMC"
                 value={pmcCount}

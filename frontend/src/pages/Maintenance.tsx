@@ -55,7 +55,7 @@ export default function Maintenance() {
       <h1>Maintenance</h1>
 
       {/* A — Stat strip (computed_status) */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="FMC" value={fmcCount} variant="success" />
         <StatCard label="PMC" value={pmcCount} variant="warning" />
         <StatCard label="NMC" value={nmcCount} variant="danger" />
@@ -202,7 +202,7 @@ function AircraftCard({ ac }: { ac: AircraftDetail }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800 text-center">
+      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800 text-center min-w-0">
         <div>
           <div className="text-xs text-slate-500">Total hrs</div>
           <div className="text-sm font-medium">{ac.total_airframe_hours.toFixed(0)}</div>

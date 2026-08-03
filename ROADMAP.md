@@ -155,30 +155,31 @@ Docs-first, extract-in-place under a **strict behavior freeze**. Spec:
 **Enables:** Phase F (responsive shell is easier once dense pages are panelized).
 
 ### Phase F — Responsive / mobile-friendly access
-**Status:** Planned — **after Phase E** (do not start until modularity pass is done)
+**Status:** Done (August 2026)
 
-Desktop remains the primary demo surface today (fixed sidebar, dense ops/maint/debrief flows). Phase F makes the product usable on **maintainer tablet and large phone** for priority paths without aiming for full phone-first parity.
+Spec: `docs/superpowers/specs/2026-08-03-phase-f-responsive-mobile-design.md`
 
-**Draft in scope**
+Desktop remains the primary portfolio surface. Phase F adds **demo-on-phone credibility**: drawer nav under `md` (768px) and minimal reflow on priority + list pages — not full phone-first parity.
 
-1. Responsive app chrome — collapsible / drawer nav so the sidebar does not permanently consume narrow viewports
-2. Reflow primary surfaces — Dashboard, Complete Sortie, Aircraft Maintenance, and key ops/maint read paths stack cleanly
-3. Touch-friendly primary actions on those paths (adequate targets; no horizontal “trap” at ~390px width for the acceptance set)
+1. ~~Responsive app chrome~~ — hamburger + overlay drawer &lt; `md`; permanent sidebar ≥ `md`
+2. ~~Reflow A paths~~ — Login, Dashboard, Complete Sortie, Aircraft Maintenance
+3. ~~Reflow B paths~~ — Maintenance list, Sorties, Crew, Readiness (scroll / stack; tables `overflow-x-auto`)
+4. ~~Docs~~ — MODULE_MAP / ROADMAP / LIMITATIONS / README note
 
-**Draft out of scope (Phase F v1)**
+**Out of scope (still)**
 
-- Phone-first visual redesign of every page
+- Phone-first redesign of every page
 - Full TV-board fidelity on small phones
 - Offline / PWA
-- Every admin table and edge workflow
+- Admin and every edge workflow polish
 
-**Acceptance (draft — refine when Phase F is designed)**
+**Acceptance**
 
-- Login + Dashboard + one maintenance path + complete-sortie path usable at ~390px width without layout trap
-- Sidebar not permanently eating the content column on narrow viewports
-- Desktop layout remains credible for portfolio review (no regression to “mobile-only” chrome)
+- Login + Dashboard + Complete Sortie + Aircraft Maintenance usable at ~390px without layout trap
+- B-set lists readable with horizontal scroll only inside tables when needed
+- Desktop ≥ 768px: permanent sidebar; no mobile-only chrome
 
-**Depends on:** Phase E preferred first (panel extractions reduce reflow risk).
+**Depends on:** Phase E (panel extractions).
 
 ### Priority stack (summary)
 
@@ -189,7 +190,7 @@ Desktop remains the primary demo surface today (fixed sidebar, dense ops/maint/d
 | **P2** | ~~Split large modules; code-split bundle; FE unit tests~~ (Phase C done) |
 | **P3** | ~~Enclosure 2 catalog + Appendix D fixtures; per-crew landings~~ (Phase D done) |
 | **P4** | ~~**Phase E** — reviewer modularity / MODULE_MAP / seed + page extractions~~ (done) |
-| **P5** | **Phase F** — responsive / mobile-friendly access (next) |
+| **P5** | ~~**Phase F** — responsive / mobile-friendly access~~ (done) |
 | **P6** | Password productization; CM depth; multi-squadron (if stakeholders require) |
 
 ---
@@ -197,7 +198,7 @@ Desktop remains the primary demo surface today (fixed sidebar, dense ops/maint/d
 ## Non-goals
 
 - Classified data handling (unclassified demonstration only)
-- **Phone-first parity with desktop** until Phase F is designed and shipped; current demo is **desktop-primary** (tablet-readable only where grids already reflow). Phase F adds responsive access — not a mobile-only product.
+- **Phone-first parity with desktop** — Phase F ships demo-on-phone credibility (drawer + reflow on A/B paths), not full mobile redesign of every surface.
 - Real-time collaborative editing (lock-on-edit is sufficient)
 - Integration with existing Navy enterprise systems at demonstration stage
 
