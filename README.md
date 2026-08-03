@@ -190,6 +190,8 @@ Phases A–F engineering work is complete for the portfolio demo (including resp
 
 **Responsive shell (Phase F):** permanent sidebar on desktop (`md`+); hamburger + overlay drawer on smaller viewports for demo-on-phone walkthroughs. Not a full mobile redesign of every page.
 
+**Pi / Tailscale demo host:** Mac is the git working repo; personal-pi can run an always-on demo on port **3091**. See [deploy/pi/README.md](deploy/pi/README.md) and `bash deploy/pi/sync-to-pi.sh`.
+
 See [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) for API surface, data model, and capability inventory.
 
 ---

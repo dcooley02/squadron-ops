@@ -1,0 +1,30 @@
+# User systemd unit — personal-pi (Raspberry Pi)
+#
+# Install (on Pi after sync / via sync-to-pi.sh):
+#   mkdir -p ~/.config/systemd/user
+#   cp deploy/pi/squadron-ops-api.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now squadron-ops-api.service
+#
+# Requires: Docker Postgres up (compose), venv + deps, frontend/dist built,
+#           .env with DATABASE_URL + SECRET_KEY + SQUADRON_OPS_STATIC_DIR.
+# Tailscale/LAN only. Do NOT enable Funnel or public port-forward for :3091.
+
+[Unit]
+Description=Squadron Ops API + SPA (portfolio demo)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/mnt/agent-data/agent/apps/squadron-ops/backend
+EnvironmentFile=-/mnt/agent-data/agent/apps/squadron-ops/.env
+Environment=SQUADRON_OPS_STATIC_DIR=/mnt/agent-data/agent/apps/squadron-ops/frontend/dist
+# Prefer venv uvicorn
+ExecStart=/mnt/agent-data/agent/apps/squadron-ops/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 3091
+Restart=on-failure
+RestartSec=5
+MemoryMax=1G
+
+[Install]
+WantedBy=default.target

@@ -9,13 +9,19 @@ function defaultApiBaseUrl(): string {
   return "http://localhost:8001";
 }
 
-/** Override with VITE_API_BASE_URL in `.env` / deploy env. */
+/**
+ * Override with VITE_API_BASE_URL at build time.
+ * - unset → defaultApiBaseUrl() (dev: same host :8001)
+ * - empty string → same-origin relative URLs (Pi reverse-proxy / static+API co-host)
+ */
+const _viteApiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
 export const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ||
-  defaultApiBaseUrl();
+  _viteApiBase === undefined
+    ? defaultApiBaseUrl()
+    : String(_viteApiBase).replace(/\/$/, "");
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || undefined,
   headers: { "Content-Type": "application/json" },
 });
 
