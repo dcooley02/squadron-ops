@@ -2,7 +2,7 @@ import { useState } from "react";
 import { parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import {
   fetchSortie,
   fetchCbrTaskOptions,
@@ -10,9 +10,7 @@ import {
   type SortieCompletePayload,
 } from "../lib/api";
 import Loading from "../components/Loading";
-import Badge from "../components/Badge";
 import {
-  uid,
   buildFlightLogActuals,
   CREW_LANDING_FIELDS,
   emptyCrewLandings,
@@ -22,64 +20,17 @@ import {
   addHoursToStr,
   durationBetween,
   type FlightMode,
-  type Grade,
-  type Severity,
-  type SafetyLevel,
   type CrewActual,
   type TaskCreditRow,
   type DiscrepancyRow,
   type SafetyRow,
 } from "./completeSortie/helpers";
-
-// ── Collapsible section ───────────────────────────────────────────────────────
-
-function Section({
-  title,
-  badge,
-  required,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  badge?: React.ReactNode;
-  required?: boolean;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="card">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between w-full text-left"
-      >
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-slate-100">{title}</span>
-          {required && (
-            <span className="text-xs text-blue-400 font-medium uppercase tracking-wide">
-              Required
-            </span>
-          )}
-          {badge}
-        </div>
-        {open ? (
-          <ChevronUp size={16} className="text-slate-400 shrink-0" />
-        ) : (
-          <ChevronDown size={16} className="text-slate-400 shrink-0" />
-        )}
-      </button>
-      {open && <div className="mt-4 space-y-4">{children}</div>}
-    </div>
-  );
-}
-
-function Lbl({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs text-slate-400 mb-1">{children}</label>;
-}
-
-const INPUT_CLS =
-  "w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-slate-500";
+import { Section, Lbl, INPUT_CLS } from "./completeSortie/Section";
+import TimesHoursPanel from "./completeSortie/TimesHoursPanel";
+import CrewActualsPanel from "./completeSortie/CrewActualsPanel";
+import TaskCreditsPanel from "./completeSortie/TaskCreditsPanel";
+import DiscrepanciesPanel from "./completeSortie/DiscrepanciesPanel";
+import SafetyPanel from "./completeSortie/SafetyPanel";
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -332,220 +283,36 @@ export default function CompleteSortie() {
         </div>
       )}
 
-      {/* ── Section 1: Times & Hours ─────────────────────────────────────── */}
-      <Section title="Times & Hours" required defaultOpen>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Lbl>Actual Takeoff</Lbl>
-            <input
-              type="datetime-local"
-              value={takeoff}
-              onChange={(e) => onTakeoffChange(e.target.value)}
-              className={INPUT_CLS}
-            />
-          </div>
-          <div>
-            <Lbl>Actual Land</Lbl>
-            <input
-              type="datetime-local"
-              value={land}
-              onChange={(e) => onLandChange(e.target.value)}
-              className={INPUT_CLS}
-            />
-          </div>
-        </div>
+      <TimesHoursPanel
+        takeoff={takeoff}
+        land={land}
+        duration={duration}
+        flightMode={flightMode}
+        dayH={dayH}
+        nightH={nightH}
+        nvgH={nvgH}
+        instrH={instrH}
+        hourMismatch={hourMismatch}
+        sumH={sumH}
+        dur={dur}
+        onTakeoffChange={onTakeoffChange}
+        onLandChange={onLandChange}
+        setDuration={setDuration}
+        setFlightMode={setFlightMode}
+        setDayH={setDayH}
+        setNightH={setNightH}
+        setNvgH={setNvgH}
+        setInstrH={setInstrH}
+      />
 
-        <div className="flex items-end gap-4">
-          <div className="w-36">
-            <Lbl>Duration (hrs)</Lbl>
-            <input
-              type="number"
-              step="0.1"
-              min="0"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className={INPUT_CLS}
-            />
-          </div>
-          <div>
-            <Lbl>Flight Mode</Lbl>
-            <div className="flex rounded overflow-hidden border border-slate-700">
-              {(["LIVE", "SIM_TOFT"] as FlightMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setFlightMode(m)}
-                  className={`px-4 py-1.5 text-sm font-medium transition-colors ${
-                    flightMode === m
-                      ? "bg-blue-700 text-white"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  {m === "LIVE" ? "Live" : "Sim / TOFT"}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <Lbl>Hour Breakdown</Lbl>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              ["Day", dayH, setDayH],
-              ["Night", nightH, setNightH],
-              ["NVG", nvgH, setNvgH],
-              ["Instrument", instrH, setInstrH],
-            ].map(([label, val, setter]) => (
-              <div key={label as string}>
-                <Lbl>{label as string}</Lbl>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={val as string}
-                  onChange={(e) => (setter as (v: string) => void)(e.target.value)}
-                  className={INPUT_CLS}
-                />
-              </div>
-            ))}
-          </div>
-          {hourMismatch && (
-            <p className="text-xs text-yellow-400 mt-1.5">
-              Hour breakdown ({sumH.toFixed(1)}) doesn't match duration ({dur.toFixed(1)}) — note
-              that overlap between categories is normal.
-            </p>
-          )}
-        </div>
-      </Section>
-
-      {/* ── Section 2: Crew Hours ────────────────────────────────────────── */}
-      <Section title="Crew Hours" required defaultOpen>
-        <div className="flex justify-end gap-3">
-          <button
-            type="button"
-            onClick={() =>
-              setCrewActuals((prev) =>
-                prev.map((c) => ({
-                  ...c,
-                  hours_logged: duration,
-                  night_hours: nightH,
-                  nvg_hours: nvgH,
-                  actual_instrument_hours: instrH,
-                }))
-              )
-            }
-            className="text-xs text-blue-400 hover:text-blue-300"
-          >
-            Apply mission profile to all crew
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setCrewActuals((prev) => prev.map((c) => ({ ...c, hours_logged: duration })))
-            }
-            className="text-xs text-blue-400 hover:text-blue-300"
-          >
-            Set all to {duration}h
-          </button>
-        </div>
-        {crewActuals.length === 0 ? (
-          <p className="text-sm text-slate-500">No crew assigned to this sortie.</p>
-        ) : (
-          <div className="space-y-2">
-            {crewActuals.map((ca, i) => (
-              <div key={ca.flight_log_id} className="space-y-2 py-2 border-b border-slate-800 last:border-0">
-                <div className="flex items-center gap-3">
-                  <Badge variant="neutral" className="shrink-0 text-xs">
-                    {ca.crew_position.replace(/_/g, " ")}
-                  </Badge>
-                  <span className="text-sm text-slate-300 flex-1 min-w-0 truncate">
-                    {ca.person_name}
-                  </span>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    value={ca.hours_logged}
-                    onChange={(e) =>
-                      setCrewActuals((prev) =>
-                        prev.map((c, j) =>
-                          j === i ? { ...c, hours_logged: e.target.value } : c
-                        )
-                      )
-                    }
-                    className="w-24 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
-                  />
-                  <span className="text-xs text-slate-500 w-4">h</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 pl-1">
-                  {(
-                    [
-                      ["Night", "night_hours"],
-                      ["NVG", "nvg_hours"],
-                      ["Instr", "actual_instrument_hours"],
-                    ] as const
-                  ).map(([label, field]) => (
-                    <div key={field}>
-                      <Lbl>{label}</Lbl>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={ca[field]}
-                        onChange={(e) =>
-                          setCrewActuals((prev) =>
-                            prev.map((c, j) =>
-                              j === i ? { ...c, [field]: e.target.value } : c
-                            )
-                          )
-                        }
-                        className={INPUT_CLS}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="pl-1">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wide mb-1">
-                    Landings (per crew)
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                    {(
-                      [
-                        ["Day", "landings_day"],
-                        ["Night", "landings_night"],
-                        ["DVE Day", "landings_dve_day"],
-                        ["DVE Nt", "landings_dve_night"],
-                        ["Ship Day", "landings_shipboard_day"],
-                        ["Ship Nt", "landings_shipboard_night"],
-                      ] as const
-                    ).map(([label, field]) => (
-                      <div key={field}>
-                        <Lbl>{label}</Lbl>
-                        <input
-                          type="number"
-                          step="1"
-                          min="0"
-                          value={ca[field]}
-                          onChange={(e) =>
-                            setCrewActuals((prev) =>
-                              prev.map((c, j) =>
-                                j === i ? { ...c, [field]: e.target.value } : c
-                              )
-                            )
-                          }
-                          className={INPUT_CLS}
-                          placeholder="0"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
+      <CrewActualsPanel
+        crewActuals={crewActuals}
+        setCrewActuals={setCrewActuals}
+        duration={duration}
+        nightH={nightH}
+        nvgH={nvgH}
+        instrH={instrH}
+      />
 
       {/* ── Section 3: Activity Quantities ──────────────────────────────── */}
       <Section
@@ -639,207 +406,21 @@ export default function CompleteSortie() {
         ))}
       </Section>
 
-      {/* ── Section 4: Task Credits ──────────────────────────────────────── */}
-      <Section
-        title="Task Credits"
-        badge={
-          taskRows.length > 0 ? (
-            <span className="text-xs text-slate-400">{taskRows.length}</span>
-          ) : null
-        }
-      >
-        <div className="space-y-2">
-          {taskRows.map((row, i) => (
-            <div key={row._key} className="flex items-center gap-2 flex-wrap">
-              <select
-                value={row.person_id}
-                onChange={(e) =>
-                  setTaskRows((prev) =>
-                    prev.map((r, j) => (j === i ? { ...r, person_id: e.target.value } : r))
-                  )
-                }
-                className="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm flex-1 min-w-0"
-              >
-                <option value="">Person…</option>
-                {crew.map((fl) => (
-                  <option key={fl.id} value={fl.person_id}>
-                    {fl.person_name}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={row.task_code}
-                onChange={(e) =>
-                  setTaskRows((prev) =>
-                    prev.map((r, j) => (j === i ? { ...r, task_code: e.target.value } : r))
-                  )
-                }
-                className="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm flex-1 min-w-0"
-              >
-                <option value="">Task code…</option>
-                {activeTaskOpts.map((o) => (
-                  <option key={o.id} value={o.code}>
-                    {o.code}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={row.grade}
-                onChange={(e) =>
-                  setTaskRows((prev) =>
-                    prev.map((r, j) =>
-                      j === i ? { ...r, grade: e.target.value as Grade } : r
-                    )
-                  )
-                }
-                className="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm w-20"
-              >
-                {(["Q", "CQ", "U", "NO", "NG"] as Grade[]).map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => setTaskRows((prev) => prev.filter((_, j) => j !== i))}
-                className="text-slate-500 hover:text-red-400 p-1"
-                title="Remove"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setTaskRows((prev) => [
-              ...prev,
-              { _key: uid(), person_id: "", task_code: "", grade: "Q", remarks: "" },
-            ])
-          }
-          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
-        >
-          <Plus size={14} /> Add Task Credit
-        </button>
-      </Section>
+      <TaskCreditsPanel
+        taskRows={taskRows}
+        setTaskRows={setTaskRows}
+        crew={crew}
+        activeTaskOpts={activeTaskOpts}
+      />
 
-      {/* ── Section 5: Discrepancies ─────────────────────────────────────── */}
-      <Section
-        title="Discrepancies"
-        badge={
-          discRows.length > 0 ? (
-            <span className="text-xs text-slate-400">
-              {discRows.length}
-              {downCount > 0 && ` · ${downCount} DOWNING`}
-              {majCount > 0 && ` · ${majCount} MAJOR`}
-            </span>
-          ) : null
-        }
-      >
-        {/* Compact mode toggle */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-400">Compact mode</span>
-          <button
-            type="button"
-            onClick={() => setDiscCompact((v) => !v)}
-            className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${
-              discCompact ? "bg-blue-600" : "bg-slate-700"
-            }`}
-            aria-pressed={discCompact}
-          >
-            <span
-              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                discCompact ? "translate-x-4" : "translate-x-0.5"
-              }`}
-            />
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {discRows.map((row, i) => (
-            <div key={row._key} className="p-3 bg-slate-800/40 rounded-lg space-y-2">
-              <div className="flex gap-2">
-                <textarea
-                  rows={2}
-                  placeholder="Description…"
-                  value={row.description}
-                  onChange={(e) =>
-                    setDiscRows((prev) =>
-                      prev.map((r, j) => (j === i ? { ...r, description: e.target.value } : r))
-                    )
-                  }
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm resize-none"
-                />
-                <div className="flex flex-col gap-2 shrink-0">
-                  <select
-                    value={row.severity}
-                    onChange={(e) =>
-                      setDiscRows((prev) =>
-                        prev.map((r, j) =>
-                          j === i ? { ...r, severity: e.target.value as Severity } : r
-                        )
-                      )
-                    }
-                    className="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm"
-                  >
-                    {(["MINOR", "MAJOR", "DOWNING"] as Severity[]).map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setDiscRows((prev) => prev.filter((_, j) => j !== i))}
-                    className="text-slate-500 hover:text-red-400 self-center p-1"
-                    title="Remove"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-              {!discCompact && (
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="System affected (e.g. AFCS)"
-                    value={row.system_affected}
-                    onChange={(e) =>
-                      setDiscRows((prev) =>
-                        prev.map((r, j) =>
-                          j === i ? { ...r, system_affected: e.target.value } : r
-                        )
-                      )
-                    }
-                    className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Notes"
-                    value={row.notes}
-                    onChange={(e) =>
-                      setDiscRows((prev) =>
-                        prev.map((r, j) => (j === i ? { ...r, notes: e.target.value } : r))
-                      )
-                    }
-                    className="bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setDiscRows((prev) => [
-              ...prev,
-              { _key: uid(), description: "", severity: "MINOR", system_affected: "", notes: "" },
-            ])
-          }
-          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
-        >
-          <Plus size={14} /> Add Discrepancy
-        </button>
-      </Section>
+      <DiscrepanciesPanel
+        discRows={discRows}
+        setDiscRows={setDiscRows}
+        discCompact={discCompact}
+        setDiscCompact={setDiscCompact}
+        downCount={downCount}
+        majCount={majCount}
+      />
 
       {/* ── Section 6: Debrief Notes ─────────────────────────────────────── */}
       <Section
@@ -859,92 +440,7 @@ export default function CompleteSortie() {
         />
       </Section>
 
-      {/* ── Section 7: Safety Reports ────────────────────────────────────── */}
-      <Section
-        title="Safety Reports"
-        badge={
-          safetyRows.length > 0 ? (
-            <span className="text-xs text-slate-400">{safetyRows.length}</span>
-          ) : null
-        }
-      >
-        <div className="space-y-2">
-          {safetyRows.map((row, i) => (
-            <div key={row._key} className="p-3 bg-slate-800/40 rounded-lg space-y-2">
-              <div className="flex items-center gap-2">
-                <select
-                  value={row.severity}
-                  onChange={(e) =>
-                    setSafetyRows((prev) =>
-                      prev.map((r, j) =>
-                        j === i ? { ...r, severity: e.target.value as SafetyLevel } : r
-                      )
-                    )
-                  }
-                  className="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-sm"
-                >
-                  {(["INFO", "HAZARD", "INCIDENT", "MISHAP"] as SafetyLevel[]).map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  placeholder="Category (optional)"
-                  value={row.category}
-                  onChange={(e) =>
-                    setSafetyRows((prev) =>
-                      prev.map((r, j) => (j === i ? { ...r, category: e.target.value } : r))
-                    )
-                  }
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setSafetyRows((prev) => prev.filter((_, j) => j !== i))}
-                  className="text-slate-500 hover:text-red-400 p-1"
-                  title="Remove"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-              <textarea
-                rows={2}
-                placeholder="Description (required)…"
-                value={row.description}
-                onChange={(e) =>
-                  setSafetyRows((prev) =>
-                    prev.map((r, j) => (j === i ? { ...r, description: e.target.value } : r))
-                  )
-                }
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm resize-none"
-              />
-              <input
-                type="text"
-                placeholder="Actions taken"
-                value={row.actions_taken}
-                onChange={(e) =>
-                  setSafetyRows((prev) =>
-                    prev.map((r, j) => (j === i ? { ...r, actions_taken: e.target.value } : r))
-                  )
-                }
-                className="w-full bg-slate-800 border border-slate-700 rounded px-3 py-1.5 text-sm"
-              />
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setSafetyRows((prev) => [
-              ...prev,
-              { _key: uid(), severity: "HAZARD", category: "", description: "", actions_taken: "" },
-            ])
-          }
-          className="flex items-center gap-1 text-sm text-blue-400 hover:text-blue-300"
-        >
-          <Plus size={14} /> Add Safety Report
-        </button>
-      </Section>
+      <SafetyPanel safetyRows={safetyRows} setSafetyRows={setSafetyRows} />
 
       {/* ── Sticky submit bar ────────────────────────────────────────────── */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 backdrop-blur border-t border-slate-800 px-4 py-3">
