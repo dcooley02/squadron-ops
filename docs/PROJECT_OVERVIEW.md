@@ -11,7 +11,7 @@ Squadron Ops addresses fragmentation in squadron operations: flight logging, rea
 **Community focus:** Helicopter Sea Combat (HSC), MH-60S  
 **Scope:** Single-squadron demonstration; multi-squadron architecture deferred  
 **Classification:** Unclassified synthetic data only  
-**Maturity:** Portfolio demonstration with deep domain modeling. Phases A–D cover quality bar, RBAC, complete integrity, maintainability, Enclosure 2-shaped CBR catalog, Appendix D fixtures, and per-crew landings. See [LIMITATIONS.md](LIMITATIONS.md) and [ROADMAP.md](../ROADMAP.md).
+**Maturity:** Portfolio demonstration with deep domain modeling. Phases A–E cover quality bar, RBAC, complete integrity, maintainability, Enclosure 2-shaped CBR catalog, Appendix D fixtures, per-crew landings, and reviewer modularity (MODULE_MAP, seed package, page panels). See [LIMITATIONS.md](LIMITATIONS.md), [MODULE_MAP.md](MODULE_MAP.md), and [ROADMAP.md](../ROADMAP.md).
 
 ---
 
@@ -27,6 +27,8 @@ Squadron Ops addresses fragmentation in squadron operations: flight logging, rea
 
 ## Architecture
 
+Navigation for contributors and reviewers: [MODULE_MAP.md](MODULE_MAP.md).
+
 ### Backend (three-layer pattern)
 
 1. **SQLAlchemy models** — `backend/app/models/` domain package (`enums`, `person`, `sortie`, `maintenance`, …; `models.py` re-exports for compatibility)
@@ -37,7 +39,7 @@ Business logic resides in `backend/app/services/` (cascade, scheduling, readines
 
 ### Frontend
 
-- **Pages** — `frontend/src/pages/` (routed views; some large debrief/maintenance screens)
+- **Pages** — `frontend/src/pages/` (routed views; Complete Sortie and Aircraft Maintenance are thin shells with panels under `completeSortie/` and `aircraftMaintenance/`)
 - **Components** — shared UI, modals, badges
 - **Board views** — fullscreen TV displays (`frontend/src/board/`)
 - **API client** — `frontend/src/lib/api/` (domain modules + hand-maintained `types.ts`; route-level `React.lazy` code-splitting)
@@ -149,7 +151,7 @@ Full interactive documentation: `http://localhost:8001/docs`
 
 ## Seed Data
 
-`backend/seed.py` wipes and repopulates a realistic squadron:
+`backend/seed/` package (entry: thin `backend/seed.py` shim → `seed.run.main()`) wipes and repopulates a realistic squadron:
 
 - 8 MH-60S aircraft (side numbers 610–617)
 - ~12 pilots, 8 aircrew, staff roles
@@ -158,7 +160,9 @@ Full interactive documentation: `http://localhost:8001/docs`
 - 92 CBR task options (Enclosure 2-shaped); Wing Table B-2 currency distribution (~88% current)
 - Gradecards, inspections, qualifications, safety reports
 
-Run: `./scripts/demo-prep.sh` or `cd backend && python seed.py`
+Modules: `constants`, `people`, `aircraft`, `cbr`, `swtp_catalog`, `training`, `sorties`, `maintenance`, `ops`, orchestrated by `run.py`.
+
+Run: `./scripts/demo-prep.sh` or `cd backend && python seed.py` (also `python -m seed`)
 
 ---
 
@@ -189,20 +193,23 @@ backend/
   app/services/     Business logic
   alembic/          Migrations
   tests/            Pytest suite
-  seed.py           Demo dataset
+  seed.py           Shim → seed.run.main()
+  seed/             Demo dataset package (people, aircraft, sorties, …)
 
 frontend/
-  src/pages/        Routed views (+ page helper modules)
+  src/pages/        Routed views (+ completeSortie/, aircraftMaintenance/)
   src/components/   Shared UI
   src/board/        TV board layouts
   src/lib/api/      Domain API client + types
   src/lib/          permissions, pdf, dates, …
   src/context/      Auth provider
 
-docs/               Overview, limitations, demo scripts
-scripts/            demo-prep.sh
+docs/               Overview, MODULE_MAP, limitations, demo scripts
+scripts/            demo-prep.sh, verify.sh
 ROADMAP.md          Domain + engineering phases
 ```
+
+Full domain index and extension recipes: [MODULE_MAP.md](MODULE_MAP.md).
 
 ---
 
@@ -210,11 +217,12 @@ ROADMAP.md          Domain + engineering phases
 
 | Document | Purpose |
 |----------|---------|
+| [MODULE_MAP.md](MODULE_MAP.md) | Domain index, cascade entry points, extension recipes |
 | [LIMITATIONS.md](LIMITATIONS.md) | Known gaps and integrity risks |
-| [../ROADMAP.md](../ROADMAP.md) | Domain build order + engineering phases A–D |
+| [../ROADMAP.md](../ROADMAP.md) | Domain build order + engineering phases A–F |
 | [DEMO_WALKTHROUGH.md](DEMO_WALKTHROUGH.md) | 12-minute demo script |
 | [DEMO_QUICK_REFERENCE.md](DEMO_QUICK_REFERENCE.md) | Accounts and troubleshooting |
 
 ---
 
-*Last updated: July 2026*
+*Last updated: August 2026*

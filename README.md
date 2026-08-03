@@ -106,7 +106,7 @@ API URL for the SPA defaults to `http://localhost:8001`. Override with `VITE_API
 
 ### Project status
 
-Domain surface through assisted scheduling, SDO tools, and TV boards is **shipped**. Phases A–D engineering work is in place (quality bar, RBAC, complete integrity, module splits, route code-splitting, **Enclosure 2-shaped CBR catalog**, **Appendix D fixtures**, **per-crew landings**).
+Domain surface through assisted scheduling, SDO tools, and TV boards is **shipped**. Phases A–E engineering work is in place (quality bar, RBAC, complete integrity, module splits, route code-splitting, **Enclosure 2-shaped CBR catalog**, **Appendix D fixtures**, **per-crew landings**, **MODULE_MAP + seed package + page panel extractions**).
 
 **RBAC:** enforced by default. For open portfolio demos, set:
 
@@ -115,7 +115,7 @@ export DEMO_OPEN_RBAC=true          # backend
 # frontend/.env — VITE_DEMO_OPEN_RBAC=true
 ```
 
-Phases A–D engineering work is complete for the portfolio demo. Further domain depth (verbatim WTM Enclosure 2, configuration management, multi-squadron) is stakeholder-driven — see [ROADMAP.md](ROADMAP.md).
+Phases A–E engineering work is complete for the portfolio demo. Next engineering priority is Phase F (responsive / mobile-friendly). Further domain depth (verbatim WTM Enclosure 2, configuration management, multi-squadron) is stakeholder-driven — see [ROADMAP.md](ROADMAP.md).
 
 ---
 
@@ -163,7 +163,7 @@ Phases A–D engineering work is complete for the portfolio demo. Further domain
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  React SPA (TanStack Query)                                 │
-│  pages · components · lib/api.ts · services                   │
+│  pages · components · lib/api/ · services                   │
 └──────────────────────────┬──────────────────────────────────┘
                            │ REST / JSON / JWT
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -185,6 +185,8 @@ Phases A–D engineering work is complete for the portfolio demo. Further domain
 - Per-crewmember flight hours on `FlightLog`, not sortie-level aggregates
 - Timestamps stored in UTC; displayed in local time on the frontend
 - Status semantics: green (good) · yellow (warning) · red (action required)
+
+**Module map:** [docs/MODULE_MAP.md](docs/MODULE_MAP.md) — domain index, cascade entry points, extension recipes, demo/verify path.
 
 See [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) for API surface, data model, and capability inventory.
 
@@ -212,11 +214,12 @@ Interactive API documentation: **http://localhost:8001/docs**
 
 | Document | Description |
 |----------|-------------|
+| [docs/MODULE_MAP.md](docs/MODULE_MAP.md) | Domain index, cascade entry points, extension recipes |
 | [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Technical overview, data model, API inventory, maturity |
 | [docs/DEMO_WALKTHROUGH.md](docs/DEMO_WALKTHROUGH.md) | 12-minute guided demonstration script |
 | [docs/DEMO_QUICK_REFERENCE.md](docs/DEMO_QUICK_REFERENCE.md) | Accounts, routes, troubleshooting |
 | [docs/LIMITATIONS.md](docs/LIMITATIONS.md) | Known limitations, integrity risks, technical debt |
-| [ROADMAP.md](ROADMAP.md) | Domain build order + engineering phases A–D |
+| [ROADMAP.md](ROADMAP.md) | Domain build order + engineering phases A–F |
 
 ---
 

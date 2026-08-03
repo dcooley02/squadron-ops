@@ -4,7 +4,7 @@ Development conventions and domain reference for Squadron Ops contributors.
 
 See [README.md](../../README.md), [ROADMAP.md](../../ROADMAP.md), [docs/PROJECT_OVERVIEW.md](../PROJECT_OVERVIEW.md), and [docs/LIMITATIONS.md](../LIMITATIONS.md) for project scope and current status.
 
-**Near-term priorities:** stakeholder-driven (CM, multi-squadron, password productization). Phases A–D done for demo scope. Full list: [ROADMAP.md](../../ROADMAP.md).
+**Near-term priorities:** Phase F (responsive) then stakeholder-driven (CM, multi-squadron, password productization). Phases A–E done for demo scope. Full list: [ROADMAP.md](../../ROADMAP.md).
 
 ## Stack
 
@@ -16,13 +16,16 @@ See [README.md](../../README.md), [ROADMAP.md](../../ROADMAP.md), [docs/PROJECT_
 
 ## Project structure
 
+See [docs/MODULE_MAP.md](../MODULE_MAP.md) for the domain index and extension recipes.
+
 - `backend/app/models/` — ORM package by domain (`enums`, `person`, `sortie`, `maintenance`, …); `models.py` re-exports
 - `backend/app/schemas/` — Pydantic request/response schemas
 - `backend/app/api/` — FastAPI route handlers, organized by feature
 - `backend/app/core/` — auth, config, shared utilities (`time.utc_now`)
 - `backend/app/services/` — business logic (cascade, currency, scheduling, logbook, qa_release)
 - `backend/alembic/` — database migrations
-- `frontend/src/pages/` — top-level page components (+ helper modules)
+- `backend/seed/` — demo dataset package; `backend/seed.py` is a thin shim (`python seed.py`)
+- `frontend/src/pages/` — top-level page shells; Complete Sortie / Aircraft Maintenance panels under `completeSortie/` and `aircraftMaintenance/`
 - `frontend/src/components/` — reusable components
 - `frontend/src/lib/api/` — domain API client + types (import as `../lib/api`)
 - `frontend/src/lib/` — permissions, pdf, dates

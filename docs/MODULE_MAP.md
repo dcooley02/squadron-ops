@@ -2,7 +2,7 @@
 
 Canonical **structure map** for reviewers and contributors: domains, layer cake, cascade entry points, extension recipes, and demo/verify path.
 
-This baseline reflects the **current tree** (Phase E Task 1). Seed is still a monolith; page panels are only partially extracted. Paths will be refreshed after seed and UI extractions (Phase E Task 5).
+This map reflects the **post Phase E** tree: seed package + shim, Complete Sortie panels, and Aircraft Maintenance sections/modals. Paths match the current repository.
 
 Related: [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) (cascade detail), [LIMITATIONS.md](LIMITATIONS.md), [ROADMAP.md](../ROADMAP.md), [README.md](../README.md).
 
@@ -20,7 +20,7 @@ Related: [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) (cascade detail), [LIMITATIO
 | Mobile | **Phase F** (responsive / mobile-friendly) — after Phase E; see [ROADMAP.md](../ROADMAP.md) |
 | Risk bar | Strict behavior freeze during Phase E modularity work |
 
-Phases A–D are done for demo scope (quality bar, RBAC, cascade integrity, module splits, Enclosure 2-shaped CBR catalog, Appendix D fixtures, per-crew landings). Phase E is docs + extract-in-place structure only — no new domain features.
+Phases A–E are done for demo scope (quality bar, RBAC, cascade integrity, module splits, Enclosure 2-shaped CBR catalog, Appendix D fixtures, per-crew landings, reviewer modularity). Phase E was docs + extract-in-place structure only — no new domain features.
 
 ---
 
@@ -46,6 +46,7 @@ Supporting layers:
 | Middleware | `backend/app/middleware/` | JWT gate, HTTP audit |
 | Core | `backend/app/core/` | Config, security, `require_roles`, `utc_now` |
 | Auth UI | `frontend/src/context/`, `lib/permissions.ts` | Session + nav RBAC |
+| Seed | `backend/seed/` (+ `backend/seed.py` shim) | Demo dataset wipe + repopulate |
 
 **Invariant:** services **flush**; route handlers **commit**. Business logic stays in services, not routes.
 
@@ -57,9 +58,9 @@ Logical domains over existing folders (not a domain monorepo). Paths are relativ
 
 | Domain | Backend | Frontend | Tests |
 |--------|---------|----------|-------|
-| Logging / cascade | `api/logging.py`, `services/flight_completion.py` | `pages/CompleteSortie.tsx`, Logbook | `tests/test_flight_completion.py` |
+| Logging / cascade | `api/logging.py`, `services/flight_completion.py` | `pages/CompleteSortie.tsx` + `pages/completeSortie/*`, Logbook | `tests/test_flight_completion.py` |
 | Readiness / WTM | `services/readiness.py`, `catalogs/cbr_enclosure2.py` | `pages/Readiness.tsx`, boards | `tests/test_readiness.py`, `test_appendix_d_fixtures.py` |
-| Maintenance | `api/maintenance.py`, `services/maintenance_chain.py`, `qa_release.py` | `pages/AircraftMaintenance.tsx`, Maintenance | `tests/test_maintenance_chain.py`, `test_qa_release.py` |
+| Maintenance | `api/maintenance.py`, `services/maintenance_chain.py`, `qa_release.py` | `pages/AircraftMaintenance.tsx` + `pages/aircraftMaintenance/*`, Maintenance | `tests/test_maintenance_chain.py`, `test_qa_release.py` |
 | Training | `api/syllabus.py`, gradecard services | `pages/Training.tsx`, gradecards | related board/ops tests as applicable |
 | Ops / SDO | `api/ops.py`, `ops_day.py`, `scheduling.py` | Ops, Schedule, boards | `tests/test_ops_and_boards.py`, `test_scheduling_assist.py` |
 | Auth | `api/auth.py`, middleware, `require_roles` | Login, Admin, `permissions.ts` | `tests/test_auth.py` |
@@ -73,7 +74,9 @@ Logical domains over existing folders (not a domain monorepo). Paths are relativ
 | WTM / CBR ratings | `services/readiness.py`, `catalogs/cbr_enclosure2.py` |
 | MAF / WO / QA release | `services/maintenance_chain.py`, `qa_release.py`, `api/maintenance.py` |
 | Scheduling assist | `services/scheduling.py` (service-sized; map only) |
-| Demo world | `backend/seed.py` (**monolith**; seed package pending) |
+| Demo world | `backend/seed/` package; entry via `backend/seed.py` shim or `python -m seed` |
+| Complete Sortie UI | `pages/CompleteSortie.tsx` shell + `pages/completeSortie/*` panels |
+| Aircraft Maintenance UI | `pages/AircraftMaintenance.tsx` shell + `pages/aircraftMaintenance/*` sections/modals |
 | API types (FE) | `frontend/src/lib/api/types.ts` (hand-maintained) |
 
 ---
@@ -104,7 +107,7 @@ Integrity (Phase B): unknown TMR/task codes and off-crew person IDs rejected; se
 
 ## 5. Repository layout (current)
 
-Honest snapshot **before** Phase E extractions. Large blobs remain intentional targets for later tasks.
+Post Phase E extraction layout. Large service/catalog modules remain intentional (not split for line count).
 
 ```
 backend/
@@ -119,17 +122,39 @@ backend/
     templates/        WeasyPrint HTML
   alembic/            Migrations
   tests/              Pytest suite (~51)
-  seed.py             Demo dataset MONOLITH (~1.9k lines)
-                      → target: backend/seed/ package + thin seed.py shim
-                        (seed package pending — Phase E Task 2)
+  seed.py             Shim → seed.run.main()  (demo-prep: python seed.py)
+  seed/               Package
+    run.py            Orchestration (wipe + main)
+    constants.py      Shared seed constants
+    people.py         Persons, quals, currencies, applicability
+    aircraft.py       Aircraft fleet
+    cbr.py            CBR task options
+    swtp_catalog.py   SWTP syllabus catalog
+    training.py       Syllabus events / training seed
+    sorties.py        Historical + scheduled sorties
+    maintenance.py    Discrepancies, inspections, MAF samples
+    ops.py            Ops day / SDO seed
 
 frontend/
   src/
     pages/            Routed views
-      CompleteSortie.tsx          ~990 lines (extraction pending)
-      completeSortie/             helpers.ts, helpers.test.ts only so far
-      AircraftMaintenance.tsx     ~1.1k lines (extraction pending)
-      aircraftMaintenance/        statusHelpers.ts only so far
+      CompleteSortie.tsx              Thin route shell (~488 lines)
+      completeSortie/                 Panels + helpers
+        helpers.ts, helpers.test.ts
+        Section.tsx
+        TimesHoursPanel.tsx
+        CrewActualsPanel.tsx
+        TaskCreditsPanel.tsx
+        DiscrepanciesPanel.tsx
+        SafetyPanel.tsx
+      AircraftMaintenance.tsx         Thin route shell (~211 lines)
+      aircraftMaintenance/            Sections + modals + helpers
+        statusHelpers.ts
+        Overlay.tsx
+        DiscrepancySection.tsx, WorkOrderSection.tsx
+        InspectionSection.tsx, LogbookSection.tsx, ReleaseSection.tsx
+        CreateDiscrepancyModal.tsx, UpdateDiscrepancyModal.tsx
+        RecordInspectionModal.tsx, QaReleaseModal.tsx
       Training.tsx, Logbook.tsx, Ops.tsx, Schedule.tsx, Readiness.tsx, …
     components/       Shared UI, modals, badges
     board/            TV boards (Ops, Maintenance, Readiness)
@@ -137,7 +162,7 @@ frontend/
     lib/              permissions, pdf, dates, …
     context/          AuthContext
 
-docs/                 Overview, limitations, demo scripts, this map
+docs/                 Overview, MODULE_MAP, limitations, demo scripts
 scripts/              demo-prep.sh, verify.sh
 ROADMAP.md
 docker-compose.yml    Postgres only (host :5433)
@@ -149,14 +174,14 @@ docker-compose.yml    Postgres only (host :5433)
 
 ## 6. Extension recipes
 
-File checklists for growth **without** multi-squadron tenancy. Paths match **today’s** tree; after Task 2, seed sections move under `backend/seed/*` (see pending package note).
+File checklists for growth **without** multi-squadron tenancy. Paths match the **post-extraction** tree.
 
 ### Recipe 1 — Add a currency type
 
-| Step | Where (current) |
-|------|-----------------|
+| Step | Where |
+|------|-------|
 | Table-driven types | `models/` — `CurrencyType` / applicability |
-| Seed type + applicability | `backend/seed.py` (currency / people section; **seed package pending** → `seed/people.py`) |
+| Seed type + applicability | `backend/seed/people.py` (currency / people section) |
 | Renewal rules | `services/currency_renewal_rules.py`, `currency_applicability.py` |
 | Cascade if complete renews it | `services/flight_completion.py` only when needed |
 | FE | Prefer API-driven surfaces (`lib/api/currency.ts`); avoid hardcoding new codes only in UI |
@@ -166,28 +191,28 @@ File checklists for growth **without** multi-squadron tenancy. Paths match **tod
 
 ### Recipe 2 — MAF / discrepancy chain field or step
 
-| Step | Where (current) |
-|------|-----------------|
+| Step | Where |
+|------|-------|
 | Model + Alembic | `models/maintenance.py`, `alembic/versions/` |
 | API + schemas | `api/maintenance.py`, `schemas/maintenance.py` |
 | Chain / QA | `services/maintenance_chain.py`, `qa_release.py` as needed |
-| Seed sample | `backend/seed.py` (discrepancy / MAF section; **seed package pending** → `seed/maintenance.py`) |
-| FE | `pages/AircraftMaintenance.tsx` (+ future `aircraftMaintenance/*` panels), `lib/api/maintenance.ts`, `types.ts` if exposed |
+| Seed sample | `backend/seed/maintenance.py` |
+| FE | `pages/AircraftMaintenance.tsx` + `pages/aircraftMaintenance/*` sections/modals, `lib/api/maintenance.ts`, `types.ts` if exposed |
 | Tests | `tests/test_maintenance_chain.py`, `test_qa_release.py` |
 
 **Invariant:** stamped vs computed status and QA release semantics (safe for flight — not “RTS”); services flush, routes commit.
 
 ### Recipe 3 — Add a syllabus event (SWTP-shaped)
 
-| Step | Where (current) |
-|------|-----------------|
-| Catalog row | `backend/seed.py` SWTP / syllabus tables (**seed package pending** → `seed/swtp_catalog.py`) — paraphrased descriptions only |
-| Seed | Training path in `seed.py` → `SyllabusEvent` (**pending** → `seed/training.py`) |
+| Step | Where |
+|------|-------|
+| Catalog row | `backend/seed/swtp_catalog.py` — paraphrased descriptions only |
+| Seed | `backend/seed/training.py` → `SyllabusEvent` |
 | Progress / boards | `services/syllabus_progress.py`, `api/syllabus.py`, boards APIs if scheduled |
 | FE | Training / gradecard pages consume API; avoid hardcoded event lists in UI |
 | Tests | Training / board tests if behavior is asserted |
 
-**Invariant:** unclassified paraphrase only; preserve AMCM code-collision convention documented in the seed header.
+**Invariant:** unclassified paraphrase only; preserve AMCM code-collision convention documented in the seed package.
 
 ---
 
@@ -231,4 +256,4 @@ API interactive docs: `http://localhost:8001/docs`.
 
 ---
 
-*Baseline map for Phase E modularity. Refresh tree + recipe paths after seed package and page panel extractions.*
+*Phase E complete (August 2026). Tree and recipes match seed package + page panel extractions.*

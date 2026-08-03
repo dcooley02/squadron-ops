@@ -140,16 +140,16 @@ These phases are ordered by integrity and maintainability, not by new domain sur
 4. Multi-squadron — still deferred
 
 ### Phase E — Reviewer modularity / growth map
-**Status:** Planned (next) — design approved 2026-08-02
+**Status:** Done (August 2026)
 
 Docs-first, extract-in-place under a **strict behavior freeze**. Spec:
 `docs/superpowers/specs/2026-08-02-modularity-growth-architecture-design.md`
 
-1. Canonical `docs/MODULE_MAP.md` (domain index, cascade pointer, demo/verify path, three extension recipes)
-2. Split `backend/seed.py` into `backend/seed/` package + shim (`python seed.py` / demo-prep unchanged)
-3. Finish Complete Sortie and Aircraft Maintenance page extractions (thin route shells + panel helpers)
-4. Link README / CONTRIBUTOR / PROJECT_OVERVIEW; refresh map after extractions
-5. Gate: `./scripts/verify.sh` — no intentional cascade/API/UI behavior change
+1. ~~Canonical `docs/MODULE_MAP.md`~~ (domain index, cascade pointer, demo/verify path, three extension recipes)
+2. ~~Split `backend/seed.py` into `backend/seed/` package + shim~~ (`python seed.py` / demo-prep unchanged)
+3. ~~Finish Complete Sortie and Aircraft Maintenance page extractions~~ (thin route shells + panel helpers)
+4. ~~Link README / CONTRIBUTOR / PROJECT_OVERVIEW; refresh map after extractions~~
+5. ~~Gate: `./scripts/verify.sh`~~ — no intentional cascade/API/UI behavior change
 
 **Depends on:** Phases A–D (done for demo scope).  
 **Enables:** Phase F (responsive shell is easier once dense pages are panelized).
@@ -188,8 +188,8 @@ Desktop remains the primary demo surface today (fixed sidebar, dense ops/maint/d
 | **P1** | ~~Timezone-aware datetimes; `VITE_API_BASE_URL`; local verify script; CI lint~~ (Phase A done) |
 | **P2** | ~~Split large modules; code-split bundle; FE unit tests~~ (Phase C done) |
 | **P3** | ~~Enclosure 2 catalog + Appendix D fixtures; per-crew landings~~ (Phase D done) |
-| **P4** | **Phase E** — reviewer modularity / MODULE_MAP / seed + page extractions (next) |
-| **P5** | **Phase F** — responsive / mobile-friendly access (after Phase E) |
+| **P4** | ~~**Phase E** — reviewer modularity / MODULE_MAP / seed + page extractions~~ (done) |
+| **P5** | **Phase F** — responsive / mobile-friendly access (next) |
 | **P6** | Password productization; CM depth; multi-squadron (if stakeholders require) |
 
 ---

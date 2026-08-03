@@ -63,7 +63,7 @@ Squadron Ops is a portfolio demonstration platform. The following limitations ar
 - HSC-specific syllabus and currency catalog (community templates planned)
 - Timestamps use `app.core.time.utc_now()` (naive UTC wall clock for TIMESTAMP WITHOUT TIME ZONE); prefer this over deprecated `datetime.utcnow()`
 - Frontend API base URL defaults to `http://localhost:8001`; override with `VITE_API_BASE_URL` (see `frontend/.env.example`)
-- `seed.py` remains a large monolith (~2k lines); page components are still large though helpers were extracted
+- Demo seed lives in `backend/seed/` package (shim `backend/seed.py` → `seed.run.main()`); Complete Sortie and Aircraft Maintenance are thin shells with panels under `completeSortie/` and `aircraftMaintenance/` (Phase E). Large service/catalog modules (`flight_completion`, `cbr_enclosure2`, `scheduling`) remain intentional
 - Transaction ownership: domain services flush; routes commit (Phase B) — audit middleware still owns its own session
 - Frontend unit tests are smoke-level (Vitest); no browser e2e suite yet
 - Automated backend suite: **51** pytest integration tests (PostgreSQL required on port 5433)
@@ -84,8 +84,8 @@ When extending this codebase:
 - Status colors: green (good) · yellow (warning) · red (action required)
 - Prefer `joinedload` / `selectinload` for relationship-heavy reads (avoid N+1)
 
-See [ROADMAP.md](../ROADMAP.md) for engineering phases (A–D) and domain build order.
+See [ROADMAP.md](../ROADMAP.md) for engineering phases (A–F) and domain build order. Structure map: [MODULE_MAP.md](MODULE_MAP.md).
 
 ---
 
-*Last updated: July 2026*
+*Last updated: August 2026*
