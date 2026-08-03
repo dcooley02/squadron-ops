@@ -16,6 +16,16 @@ Squadron Ops is a portfolio demonstration platform. The following limitations ar
 - Setting `ENVIRONMENT=production` refuses the demo JWT secret and refuses `DEMO_OPEN_RBAC=true` (startup ValidationError)
 - Password reset as a product feature is not implemented
 
+### Personal-pi / Tailscale demo host
+
+- Optional always-on host: see [deploy/pi/README.md](../deploy/pi/README.md). **Mac remains the git working repo**; Pi is a runtime deploy target only.
+- Trust boundary = **Tailscale tailnet and/or home LAN** — same class as syllabus-tracker `:3090`. **Do not** enable Tailscale Funnel or WAN port-forward for **:3091**.
+- Postgres on the Pi is bound to **`127.0.0.1:5433` only** (not exposed on the tailnet).
+- API+SPA listen on **`0.0.0.0:3091`** so Tailscale clients can connect; anyone on your tailnet (or LAN if allowed) who can reach `:3091` can use the demo (JWT login still required for `/api/*`).
+- Pi `.env` holds generated `SECRET_KEY` + Postgres password (created on first install; **not** overwritten by sync). File mode should be **600**. Demo user password remains seed `demo1234`.
+- OpenAPI UI at `/docs` is available on the Pi host for technical demos — treat as on-trust-network only.
+- WeasyPrint/PDF export is **best-effort** on the Pi (may return 503 if system libraries are missing).
+
 ---
 
 ## Flight completion integrity

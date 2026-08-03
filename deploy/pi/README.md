@@ -70,10 +70,31 @@ Logs: `journalctl --user -u squadron-ops-api -f`
 ## Security model
 
 - Trust boundary = **Tailscale / home LAN** (same class as syllabus `:3090`).
-- Demo JWT + seed passwords are for **portfolio demo**, not public internet.
-- `ENVIRONMENT=development` on Pi so demo logins work; use a long random `SECRET_KEY` and Postgres password (generated on first install).
+- Demo user passwords (`demo1234`) are for **portfolio demo**, not public internet.
+- `ENVIRONMENT=development` on Pi so demo logins work; **first install generates** a long random `SECRET_KEY` and Postgres password (not the repo demo JWT default).
+- Pi `.env` is mode **600** and is **never** rsynced from Mac (sync excludes `.env`).
+- Postgres publishes only on **`127.0.0.1:5433`** (host loopback).
+- API+SPA bind **`0.0.0.0:3091`** for Tailscale reachability — **not** for the public internet.
 - Do **not** enable Tailscale **Funnel** or WAN port-forward for **3091**.
+- OpenAPI `/docs` is enabled on the Pi for technical demos (same trust boundary as the app).
 - If UFW blocks Tailscale → phone: allow `3091/tcp` from `100.64.0.0/10` (and LAN if desired) — needs sudo on Pi.
+
+### Security checklist (ops)
+
+| Check | Expected |
+|-------|----------|
+| Funnel / public port-forward | **Off** |
+| Postgres bind | `127.0.0.1:5433` only |
+| App port | `3091` on tailnet/LAN only |
+| `.env` mode | `600` |
+| `SECRET_KEY` | Not the repo demo default string |
+| GitHub | No Pi `.env` or real passwords committed |
+
+## Status (as of first live deploy)
+
+- Unit: `squadron-ops-api.service` (user systemd)
+- Health: `GET /health` → 200
+- Demo seed loaded (empty-DB first install)
 
 ## Workflow (ongoing)
 

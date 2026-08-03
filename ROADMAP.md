@@ -192,6 +192,18 @@ Desktop remains the primary portfolio surface. Phase F adds **demo-on-phone cred
 | **P4** | ~~**Phase E** — reviewer modularity / MODULE_MAP / seed + page extractions~~ (done) |
 | **P5** | ~~**Phase F** — responsive / mobile-friendly access~~ (done) |
 | **P6** | Password productization; CM depth; multi-squadron (if stakeholders require) |
+| **Ops** | Personal-pi always-on Tailscale demo (`deploy/pi/`, port **3091**) — Mac remains git SoT |
+
+---
+
+## Hosted demo (personal-pi)
+
+| Item | Detail |
+|------|--------|
+| Purpose | Continuous portfolio demo reachable on phone via Tailscale |
+| Deploy | `bash deploy/pi/sync-to-pi.sh` from Mac |
+| Docs | [deploy/pi/README.md](deploy/pi/README.md) |
+| Not | Public internet / Funnel / production multi-tenant SaaS |
 
 ---
 

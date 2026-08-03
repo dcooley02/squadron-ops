@@ -236,13 +236,22 @@ File checklists for growth **without** multi-squadron tenancy. Paths match the *
 6. **Prove spine:** complete NVG-related sortie → currency / hours / jacket (see §4). Guided script: [DEMO_WALKTHROUGH.md](DEMO_WALKTHROUGH.md).  
 7. **Caveats:** [LIMITATIONS.md](LIMITATIONS.md) (demo secrets, `DEMO_OPEN_RBAC`, portfolio posture).
 
-### Ports
+### Ports (Mac local demo)
 
 | Service | Port |
 |---------|------|
 | API (uvicorn) | **8001** |
 | UI (Vite) | **5174** |
 | PostgreSQL (Compose host map) | **5433** |
+
+### Personal-pi always-on demo (Tailscale)
+
+| Item | Value |
+|------|--------|
+| URL | `http://100.66.35.41:3091/` (also MagicDNS / `personal-pi:3091`) |
+| Stack | Single uvicorn process: SPA + `/api/*` + `/health` |
+| Deploy | From Mac: `bash deploy/pi/sync-to-pi.sh` — see [deploy/pi/README.md](../deploy/pi/README.md) |
+| Data | Pi Postgres volume; seed-if-empty on first install; Mac DB does not sync |
 
 ### Release gate
 
@@ -252,8 +261,8 @@ File checklists for growth **without** multi-squadron tenancy. Paths match the *
 # SKIP_COMPOSE=1 / SKIP_LINT=1 available when needed
 ```
 
-API interactive docs: `http://localhost:8001/docs`.
+API interactive docs (local): `http://localhost:8001/docs`. Pi: `http://<pi-host>:3091/docs` (tailnet only).
 
 ---
 
-*Phase E complete (August 2026). Tree and recipes match seed package + page panel extractions.*
+*Phases E–F complete (August 2026). Pi deploy package live for Tailscale demos.*
