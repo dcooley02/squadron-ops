@@ -171,7 +171,7 @@ Run: `./scripts/demo-prep.sh` or `cd backend && python seed.py` (also `python -m
 | Check | Command / notes |
 |-------|-----------------|
 | Full gate | `./scripts/verify.sh` — compose → pytest → FE test → build → lint |
-| Backend tests | `cd backend && pytest -q` — **51** tests; requires Postgres (port **5433**) |
+| Backend tests | `cd backend && pytest -q` — **54** tests; requires Postgres (port **5433**) |
 | Frontend tests | `cd frontend && npm run test` — Vitest unit smoke tests |
 | Frontend build | `cd frontend && npm run build` (`tsc -b` + Vite, code-split chunks) |
 | Frontend lint | `cd frontend && npm run lint` — gated in CI |

@@ -1,4 +1,13 @@
-"""SWTP event catalog and gradecard line-item templates."""
+"""SWTP event catalog and gradecard line-item templates.
+
+Event names and line-item descriptions are paraphrased demonstration text —
+not verbatim doctrine from COMHELSEACOMBATWING 3502.8 / IC1.
+
+AMCM code-collision convention: where PILOT_AMCM shares an event number with
+PILOT_CORE (e.g. both have P211, P291), the AMCM version uses an `_AMCM`
+suffix on both SyllabusEvent.code and .event_code (e.g. ``P211_AMCM``).
+Codes unique to AMCM (e.g. P210, P220) need no suffix.
+"""
 from app.models.models import EventVenue, GradingScheme, SyllabusTrack
 
 from seed.constants import GCS, LIR, GS, SL, SS, ST, EV

@@ -24,7 +24,7 @@ The original build order prioritized the operational spine first (flight → cas
 | Assisted scheduling | Shipped (human-in-the-loop only) |
 | JWT authentication | Shipped |
 | Production RBAC | **Enforced** (`require_roles` + frontend guards); opt-out via `DEMO_OPEN_RBAC` / `VITE_DEMO_OPEN_RBAC` |
-| Automated tests | 51 pytest cases (Postgres required); no frontend tests |
+| Automated tests | 54 pytest cases (Postgres required); frontend vitest present |
 | CI | GitHub Actions: Postgres → pytest → frontend production build |
 | Product posture | Portfolio demonstration — not production-hardened |
 
@@ -212,7 +212,7 @@ Local automated checks:
 ```bash
 ./scripts/verify.sh              # compose up → pytest → FE test → build → lint
 # or:
-cd backend && pytest -q          # 51 tests (Postgres on :5433)
+cd backend && pytest -q          # 54 tests (Postgres on :5433)
 cd frontend && npm run test && npm run build && npm run lint
 ```
 

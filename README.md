@@ -15,7 +15,7 @@ Built by a naval aviator to demonstrate credible domain modeling, full-stack eng
 - **Assisted scheduling** — ranked crew suggestions and week proposals with transparent fitness warnings (human-in-the-loop)
 - **SDO operations** — schedule publish, watchbill, day-of-ops status, ATO and brief-sheet PDF export
 - **Fullscreen TV boards** — squadron snapshot for ready-room displays
-- **51 automated tests** and CI pipeline (PostgreSQL → pytest → lint → production build)
+- **54 automated backend tests** and CI pipeline (PostgreSQL → pytest → lint → production build)
 
 ---
 
@@ -94,7 +94,7 @@ PostgreSQL must be running (Docker Desktop + Compose; port **5433**). Without it
 ./scripts/verify.sh
 
 # Or step-by-step:
-cd backend && pytest -q          # 51 tests (Postgres on :5433)
+cd backend && pytest -q          # 54 tests (Postgres on :5433)
 cd frontend && npm run test      # Vitest unit tests
 cd frontend && npm run build
 cd frontend && npm run lint      # gated in CI

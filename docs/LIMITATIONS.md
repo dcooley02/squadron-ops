@@ -66,7 +66,7 @@ Squadron Ops is a portfolio demonstration platform. The following limitations ar
 - Demo seed lives in `backend/seed/` package (shim `backend/seed.py` → `seed.run.main()`); Complete Sortie and Aircraft Maintenance are thin shells with panels under `completeSortie/` and `aircraftMaintenance/` (Phase E). Large service/catalog modules (`flight_completion`, `cbr_enclosure2`, `scheduling`) remain intentional
 - Transaction ownership: domain services flush; routes commit (Phase B) — audit middleware still owns its own session
 - Frontend unit tests are smoke-level (Vitest); no browser e2e suite yet
-- Automated backend suite: **51** pytest integration tests (PostgreSQL required on port 5433)
+- Automated backend suite: **54** pytest integration tests (PostgreSQL required on port 5433)
 - Tests fail hard if Docker/Postgres is not running — use `./scripts/verify.sh` or `docker compose up -d`
 - CI: GitHub Actions (Postgres → pytest → frontend lint → FE unit test → build)
 

@@ -121,18 +121,18 @@ backend/
     services/         Business logic (flight_completion, readiness, …)
     templates/        WeasyPrint HTML
   alembic/            Migrations
-  tests/              Pytest suite (~51)
+  tests/              Pytest suite (54)
   seed.py             Shim → seed.run.main()  (demo-prep: python seed.py)
   seed/               Package
     run.py            Orchestration (wipe + main)
     constants.py      Shared seed constants
     people.py         Persons, quals, currencies, applicability
-    aircraft.py       Aircraft fleet
-    cbr.py            CBR task options
+    aircraft.py       Aircraft fleet + inspection types/inspections
+    cbr.py            CBR task options + capability area configs
     swtp_catalog.py   SWTP syllabus catalog
     training.py       Syllabus events / training seed
     sorties.py        Historical + scheduled sorties
-    maintenance.py    Discrepancies, inspections, MAF samples
+    maintenance.py    Discrepancies
     ops.py            Ops day / SDO seed
 
 frontend/
