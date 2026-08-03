@@ -115,7 +115,7 @@ export DEMO_OPEN_RBAC=true          # backend
 # frontend/.env — VITE_DEMO_OPEN_RBAC=true
 ```
 
-Phases A–E engineering work is complete for the portfolio demo. Next engineering priority is Phase F (responsive / mobile-friendly). Further domain depth (verbatim WTM Enclosure 2, configuration management, multi-squadron) is stakeholder-driven — see [ROADMAP.md](ROADMAP.md).
+Phases A–F engineering work is complete for the portfolio demo (including responsive shell). Further domain depth (verbatim WTM Enclosure 2, configuration management, multi-squadron, password productization) is stakeholder-driven — see [ROADMAP.md](ROADMAP.md).
 
 ---
 

@@ -4,7 +4,7 @@ Development conventions and domain reference for Squadron Ops contributors.
 
 See [README.md](../../README.md), [ROADMAP.md](../../ROADMAP.md), [docs/PROJECT_OVERVIEW.md](../PROJECT_OVERVIEW.md), and [docs/LIMITATIONS.md](../LIMITATIONS.md) for project scope and current status.
 
-**Near-term priorities:** Phase F (responsive) then stakeholder-driven (CM, multi-squadron, password productization). Phases A–E done for demo scope. Full list: [ROADMAP.md](../../ROADMAP.md).
+**Near-term priorities:** stakeholder-driven (CM, multi-squadron, password productization). Phases A–F done for demo scope (incl. responsive shell). Full list: [ROADMAP.md](../../ROADMAP.md).
 
 ## Stack
 

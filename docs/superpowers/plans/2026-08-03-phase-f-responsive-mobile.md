@@ -1,6 +1,8 @@
 # Phase F — Responsive / Mobile-Friendly Access Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+>
+> **Retrospective process note (2026-08-03):** Implementation was batched into monocommit `46f61ea` on `master` without live SDD/worktree. Checkboxes below are closed against that commit + verification in `.superpowers/sdd/2026-08-03-phase-f-responsive-mobile/`. Full SDD-at-implement is **not** claimed; product outcomes are.
 
 **Goal:** Deliver demo-on-phone credibility: drawer nav under 768px and no horizontal layout traps on Login, Dashboard, Complete Sortie, Aircraft Maintenance, plus Maintenance/Sorties/Crew/Readiness lists — while preserving permanent desktop sidebar.
 
@@ -43,7 +45,7 @@
 - Produces: `SidebarProps = { mode?: "static" | "drawer"; onNavigate?: () => void; className?: string }`
 - Layout: `const [navOpen, setNavOpen] = useState(false)`; `useEffect` on `location.pathname` → `setNavOpen(false)`
 
-- [ ] **Step 1: Update Sidebar to accept mode + onNavigate**
+- [x] **Step 1: Update Sidebar to accept mode + onNavigate**
 
 Extract the existing aside content. When `mode === "drawer"`, render as:
 
@@ -76,7 +78,7 @@ Keep Sidebar as the **inner** nav panel (always `w-56 bg-slate-900 … flex flex
 
 On every `NavLink` click and Sign out, call `onNavigate?.()`.
 
-- [ ] **Step 2: Rewrite Layout**
+- [x] **Step 2: Rewrite Layout**
 
 ```tsx
 import { useEffect, useState } from "react";
@@ -147,7 +149,7 @@ export default function Layout() {
 
 Ensure Sidebar root is `h-full` / `flex flex-col` so drawer fills height.
 
-- [ ] **Step 3: Build FE**
+- [x] **Step 3: Build FE**
 
 ```bash
 cd frontend && npm run test && npx eslint src/components/Layout.tsx src/components/Sidebar.tsx && npx tsc -b --pretty false
@@ -155,7 +157,7 @@ cd frontend && npm run test && npx eslint src/components/Layout.tsx src/componen
 
 Expected: pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/Layout.tsx frontend/src/components/Sidebar.tsx
@@ -176,26 +178,26 @@ git commit -m "feat: responsive shell with mobile nav drawer"
 - Complete Sortie sticky bar: ensure `left-0 right-0` relative to main, not full viewport under sidebar; use `sticky bottom-0` inside content or fixed within main — keep existing sticky behavior usable (check current classes)
 - Touch: primary buttons `min-h-10` / `py-2.5` where clearly cramped
 
-- [ ] **Step 1: Dashboard grids**
+- [x] **Step 1: Dashboard grids**
 
 Known hotspots from scan:
 - `grid grid-cols-2 gap-3 lg:col-span-2` → `grid grid-cols-1 sm:grid-cols-2 …`
 - `col-span-2 grid grid-cols-3` → `col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-3`
 
-- [ ] **Step 2: Complete Sortie / panels**
+- [x] **Step 2: Complete Sortie / panels**
 
 - `grid-cols-2 sm:grid-cols-4` activity rows — ok if cells wrap; add `min-w-0` on parent cards if needed
 - Sticky footer: if using `fixed`, switch to sticky within scroll container or `fixed bottom-0 left-0 right-0 md:left-56` only if that matches design — prefer not inventing md:left-56 if sticky already works inside main
 
-- [ ] **Step 3: Aircraft Maintenance header metrics**
+- [x] **Step 3: Aircraft Maintenance header metrics**
 
 - Already `grid-cols-2 sm:grid-cols-4` — ok; ensure card `min-w-0`
 
-- [ ] **Step 4: Login**
+- [x] **Step 4: Login**
 
 - Centered form: ensure `w-full max-w-sm px-4` and no overflow
 
-- [ ] **Step 5: FE verify + commit**
+- [x] **Step 5: FE verify + commit**
 
 ```bash
 cd frontend && npm run test && npx tsc -b --pretty false
@@ -212,8 +214,8 @@ git commit -m "fix: reflow priority pages for narrow viewports"
 - `Sorties.tsx` / `Crew.tsx` — wrap table: `<div className="card p-0 overflow-x-auto">` (already overflow-hidden — change to `overflow-x-auto` so table can scroll horizontally if needed)
 - `Readiness.tsx` — `grid-cols-2 md:grid-cols-4` → `grid-cols-1 sm:grid-cols-2 md:grid-cols-4`; ensure all tables inside `overflow-x-auto`
 
-- [ ] **Step 1: Apply fixes**
-- [ ] **Step 2: FE verify + commit**
+- [x] **Step 1: Apply fixes**
+- [x] **Step 2: FE verify + commit**
 
 ```bash
 cd frontend && npm run test && npx tsc -b --pretty false
@@ -231,8 +233,8 @@ git commit -m "fix: reflow list/readiness pages for narrow viewports"
 - `README.md` — one line under Architecture or features
 - `docs/LIMITATIONS.md` — phone demo paths, not full mobile parity
 
-- [ ] **Step 1: Update docs**
-- [ ] **Step 2: Commit**
+- [x] **Step 1: Update docs**
+- [x] **Step 2: Commit**
 
 ```bash
 git add ROADMAP.md docs/MODULE_MAP.md README.md docs/LIMITATIONS.md
@@ -243,9 +245,9 @@ git commit -m "docs: mark Phase F responsive shell complete"
 
 ### Task 5: Full verification
 
-- [ ] **Step 1:** `./scripts/verify.sh` or equivalent (pytest + npm test + lint + build)
-- [ ] **Step 2:** Manual checklist note in commit message or report (390px paths)
-- [ ] **Step 3:** Confirm no backend/seed diffs: `git diff origin/master -- backend/` should be empty for this phase (except if only docs)
+- [x] **Step 1:** `./scripts/verify.sh` or equivalent (pytest + npm test + lint + build)
+- [x] **Step 2:** Manual checklist note in commit message or report (390px paths)
+- [x] **Step 3:** Confirm no backend/seed diffs: `git diff origin/master -- backend/` should be empty for this phase (except if only docs)
 
 ---
 
@@ -265,3 +267,13 @@ git commit -m "docs: mark Phase F responsive shell complete"
 ## Execution handoff
 
 Plan complete at `docs/superpowers/plans/2026-08-03-phase-f-responsive-mobile.md`.
+
+## Execution record (2026-08-03)
+
+| Mode | What happened |
+|------|----------------|
+| Intended | SDD or executing-plans with worktree + per-task commits |
+| Actual | Inline monocommit `46f61ea` on `master` after spec/plan |
+| Remediation | Retrospective SDD ledger + Task 5 verify + checkbox close + living-doc drift fix |
+
+**Do not claim “full SDD-at-implement.”** Claim **product complete** with verify evidence.
