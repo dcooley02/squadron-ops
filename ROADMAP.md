@@ -139,6 +139,47 @@ These phases are ordered by integrity and maintainability, not by new domain sur
 3. Maintenance configuration management — still deferred (stakeholder-driven)
 4. Multi-squadron — still deferred
 
+### Phase E — Reviewer modularity / growth map
+**Status:** Planned (next) — design approved 2026-08-02
+
+Docs-first, extract-in-place under a **strict behavior freeze**. Spec:
+`docs/superpowers/specs/2026-08-02-modularity-growth-architecture-design.md`
+
+1. Canonical `docs/MODULE_MAP.md` (domain index, cascade pointer, demo/verify path, three extension recipes)
+2. Split `backend/seed.py` into `backend/seed/` package + shim (`python seed.py` / demo-prep unchanged)
+3. Finish Complete Sortie and Aircraft Maintenance page extractions (thin route shells + panel helpers)
+4. Link README / CONTRIBUTOR / PROJECT_OVERVIEW; refresh map after extractions
+5. Gate: `./scripts/verify.sh` — no intentional cascade/API/UI behavior change
+
+**Depends on:** Phases A–D (done for demo scope).  
+**Enables:** Phase F (responsive shell is easier once dense pages are panelized).
+
+### Phase F — Responsive / mobile-friendly access
+**Status:** Planned — **after Phase E** (do not start until modularity pass is done)
+
+Desktop remains the primary demo surface today (fixed sidebar, dense ops/maint/debrief flows). Phase F makes the product usable on **maintainer tablet and large phone** for priority paths without aiming for full phone-first parity.
+
+**Draft in scope**
+
+1. Responsive app chrome — collapsible / drawer nav so the sidebar does not permanently consume narrow viewports
+2. Reflow primary surfaces — Dashboard, Complete Sortie, Aircraft Maintenance, and key ops/maint read paths stack cleanly
+3. Touch-friendly primary actions on those paths (adequate targets; no horizontal “trap” at ~390px width for the acceptance set)
+
+**Draft out of scope (Phase F v1)**
+
+- Phone-first visual redesign of every page
+- Full TV-board fidelity on small phones
+- Offline / PWA
+- Every admin table and edge workflow
+
+**Acceptance (draft — refine when Phase F is designed)**
+
+- Login + Dashboard + one maintenance path + complete-sortie path usable at ~390px width without layout trap
+- Sidebar not permanently eating the content column on narrow viewports
+- Desktop layout remains credible for portfolio review (no regression to “mobile-only” chrome)
+
+**Depends on:** Phase E preferred first (panel extractions reduce reflow risk).
+
 ### Priority stack (summary)
 
 | Priority | Work |
@@ -147,14 +188,16 @@ These phases are ordered by integrity and maintainability, not by new domain sur
 | **P1** | ~~Timezone-aware datetimes; `VITE_API_BASE_URL`; local verify script; CI lint~~ (Phase A done) |
 | **P2** | ~~Split large modules; code-split bundle; FE unit tests~~ (Phase C done) |
 | **P3** | ~~Enclosure 2 catalog + Appendix D fixtures; per-crew landings~~ (Phase D done) |
-| **P4** | Password productization; CM depth; multi-squadron (if stakeholders require) |
+| **P4** | **Phase E** — reviewer modularity / MODULE_MAP / seed + page extractions (next) |
+| **P5** | **Phase F** — responsive / mobile-friendly access (after Phase E) |
+| **P6** | Password productization; CM depth; multi-squadron (if stakeholders require) |
 
 ---
 
 ## Non-goals
 
 - Classified data handling (unclassified demonstration only)
-- Mobile-first design (tablet-readable for maintainers; phone-first out of scope)
+- **Phone-first parity with desktop** until Phase F is designed and shipped; current demo is **desktop-primary** (tablet-readable only where grids already reflow). Phase F adds responsive access — not a mobile-only product.
 - Real-time collaborative editing (lock-on-edit is sufficient)
 - Integration with existing Navy enterprise systems at demonstration stage
 
@@ -187,4 +230,4 @@ CI runs Postgres → pytest → frontend lint → FE unit tests → frontend bui
 
 ---
 
-*Last updated: July 2026*
+*Last updated: August 2026*

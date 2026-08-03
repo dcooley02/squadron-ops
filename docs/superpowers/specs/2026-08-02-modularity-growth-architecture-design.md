@@ -25,6 +25,7 @@ Original build momentum left a credible product with living docs (Phases A–D d
 - Password productization, configuration-management depth, browser e2e suite
 - Visual redesign or API contract changes
 - Refactoring `flight_completion.py` / `scheduling.py` / `cbr_enclosure2.py` for line-count alone
+- **Responsive / mobile-friendly UI (Phase F)** — planned **after** this modularity pass; not in scope here. Desktop-primary chrome stays as-is under the behavior freeze. Phase E panel extractions are preferred first so Phase F can reflow panels cleanly (see `ROADMAP.md`).
 
 ## Product constraints (locked)
 
@@ -282,10 +283,24 @@ Docs early so extractions have a target; refresh at end so paths match reality.
 
 ## Out of scope follow-ups (not this pass)
 
+- **Phase F — Responsive / mobile-friendly access** (next pass after Phase E completes; see ROADMAP)
 - Broader write-route RBAC coverage (LIMITATIONS)
 - Optional OpenAPI type regeneration
 - Further page splits (Logbook, Training, GradecardFill) if still large after this pass
 - Domain monorepo if product direction later requires multi-squadron
+
+## Sequencing with Phase F
+
+```
+Phase E (this design)  →  Phase F (mobile/responsive)  →  later product work
+```
+
+| Phase | Focus | Behavior freeze? |
+|-------|--------|------------------|
+| **E** | MODULE_MAP, seed package, Complete Sortie / Aircraft Maintenance panels | Yes — structure only |
+| **F** | Drawer nav, reflow priority pages, touch targets | No — intentional UI change; separate design + plan |
+
+Do not start Phase F implementation until Phase E is verified complete.
 
 ---
 
@@ -298,7 +313,8 @@ Docs early so extractions have a target; refresh at end so paths match reality.
 | Risk bar | Strict behavior freeze (A) |
 | Reviewer outcome | Module map + demo path + three extension recipes (D) |
 | Approach | Docs-first, extract-in-place (1) |
+| Mobile | Roadmap Phase F **after** Phase E; not in this pass |
 
 ---
 
-*Design produced via Superpowers brainstorming. Next step after user approves this file: writing-plans → implementation plan only (no code until plan is approved).*
+*Design produced via Superpowers brainstorming. Roadmap sequencing (E then F) locked 2026-08-02. Next step after user approves this file: writing-plans → implementation plan for Phase E only (no code until plan is approved).*
